@@ -1,0 +1,66 @@
+name: Claude Code Review
+
+# Schedules an automated code review after each pull request is opened or updated.
+# The review follows the standards defined in AGENTS.md, posts the findings as
+# comments on the PR, and mentions @jules so it can check the review.
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+# Cancel an in-flight review if the PR is pushed to again before it finishes.
+concurrency:
+  group: claude-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  claude-review:
+    # Skip drafts; review once they are marked ready.
+    if: github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
+      id-token: write
+    steps:
+      - name: Checkout PR
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run Claude code review
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          prompt: |
+            You are reviewing pull request #${{ github.event.pull_request.number }}
+            in the repository ${{ github.repository }}.
+
+            Review ONLY the changes in this PR (the diff against the base branch).
+
+            Read AGENTS.md at the root of the repository and treat its
+            "Tech Stack & Standards" and "Architectural Directives" sections as the
+            authoritative review checklist. Pay particular attention to:
+              - AccessibilityService thread safety (no blocking the service thread;
+                heavy work on Dispatchers.Default / Dispatchers.IO) and memory-leak
+                safety across rapidly changing screen states.
+              - Strict context-window / node-traversal optimization: filtering of
+                invisible/decorative nodes and minimal, shortened-key screen
+                serialization.
+              - The action-dispatch mapping layer and its fallback gestures.
+              - Separation of concerns between the LLM reasoning engine, the UI-tree
+                serializer, and the AccessibilityService lifecycle, and whether the
+                reasoning engine stays unit-testable with mock UI JSON.
+            Also flag general Kotlin / Jetpack Compose (Material 3) / Coroutines
+            correctness, concurrency, and clarity issues.
+
+            Post your review as comments on the pull request:
+              - Use inline review comments on specific lines where possible.
+              - Add one short summary comment describing the overall assessment.
+            If the diff is clean, say so clearly instead of inventing problems.
+
+            End your summary comment with a line that mentions @jules and asks it to
+            check the code review, for example:
+            "@jules please take a look at this code review and verify the findings."
+          claude_args: |
+            --allowedTools "Read,Grep,Glob,mcp__github__get_pull_request,mcp__github__get_pull_request_diff,mcp__github__get_pull_request_files,mcp__github__create_pending_pull_request_review,mcp__github__add_pull_request_review_comment_to_pending_review,mcp__github__submit_pending_pull_request_review,mcp__github__add_issue_comment"
