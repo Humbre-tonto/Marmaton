@@ -32,7 +32,6 @@ fun DashboardScreen() {
 
     val modelStatus by GemmaAgentEngine.modelStatus.collectAsState()
     val isDownloading by GemmaAgentEngine.isDownloading.collectAsState()
-    val downloadProgress by GemmaAgentEngine.downloadProgress.collectAsState()
 
     val isAgentRunning by AgentForegroundService.isRunning.collectAsState()
     val runLog by AgentForegroundService.runLog.collectAsState()
@@ -90,8 +89,8 @@ fun DashboardScreen() {
 
                     if (isDownloading) {
                         Spacer(modifier = Modifier.height(8.dp))
+                        // Display clean indeterminate progress bar for smooth feedback during download
                         LinearProgressIndicator(
-                            progress = downloadProgress,
                             modifier = Modifier.fillMaxWidth()
                         )
                     } else if (modelStatus.contains("ready") || modelStatus.contains("downloaded")) {

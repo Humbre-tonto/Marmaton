@@ -2,8 +2,15 @@ package com.marmaton.agent.parser
 
 import android.graphics.Rect
 import android.view.accessibility.AccessibilityNodeInfo
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 
 object ScreenTreeParser {
+
+    private val json = Json {
+        encodeDefaults = false
+        explicitNulls = false
+    }
 
     /**
      * Traverses the AccessibilityNodeInfo tree and serializes it to a compact, minimal JSON array string.
@@ -13,7 +20,11 @@ object ScreenTreeParser {
         if (root == null) return "[]"
         val nodes = mutableListOf<ScreenNode>()
         traverseAndCollect(root, nodes)
-        return "[${nodes.joinToString(",") { it.toJsonString() }}]"
+        return try {
+            json.encodeToString(nodes)
+        } catch (e: Exception) {
+            "[]"
+        }
     }
 
     private fun traverseAndCollect(node: AccessibilityNodeInfo, list: MutableList<ScreenNode>) {
@@ -41,9 +52,9 @@ object ScreenTreeParser {
                 val shortId = id?.substringAfter("/") ?: id
                 list.add(
                     ScreenNode(
-                        id = shortId,
-                        txt = text,
-                        desc = desc,
+                        id = if (shortId.isNullOrEmpty()) null else shortId,
+                        txt = if (text.isNullOrEmpty()) null else text,
+                        desc = if (desc.isNullOrEmpty()) null else desc,
                         clk = isClickable,
                         scrl = isScrollable,
                         bnd = listOf(bounds.left, bounds.top, bounds.right, bounds.bottom)

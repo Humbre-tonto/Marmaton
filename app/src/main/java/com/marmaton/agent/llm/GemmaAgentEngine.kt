@@ -120,10 +120,11 @@ object GemmaAgentEngine {
         }
     }
 
-    suspend fun reasonAction(userGoal: String, serializedScreen: String): AgentAction? {
-        val model = generativeModel ?: return null
-
-        val systemPrompt = """
+    /**
+     * Decoupled system prompt builder to enable framework-free JVM unit testing of prompt generation.
+     */
+    fun buildSystemPrompt(userGoal: String, serializedScreen: String): String {
+        return """
             You are Marmaton, an extremely capable local Android device agent. Your goal is to help the user achieve: "$userGoal"
             Below is the current screen state in a minimized JSON format of on-screen elements (bnd represents bounds: [left, top, right, bottom]).
 
@@ -146,21 +147,37 @@ object GemmaAgentEngine {
             Current Screen State:
             $serializedScreen
         """.trimIndent()
+    }
 
+    /**
+     * Decoupled action parser to enable framework-free JVM unit testing of Gemma reasoning outputs.
+     */
+    fun parseAction(rawText: String): AgentAction? {
+        return try {
+            val cleanJson = cleanJsonString(rawText)
+            jsonParser.decodeFromString<AgentAction>(cleanJson)
+        } catch (e: Exception) {
+            try {
+                Log.e(TAG, "Failed parsing action JSON", e)
+            } catch (le: RuntimeException) {
+                // Handle JVM unit tests where android.util.Log is not mocked
+                println("Failed parsing action JSON: ${e.message}")
+            }
+            null
+        }
+    }
+
+    suspend fun reasonAction(userGoal: String, serializedScreen: String): AgentAction? {
+        val model = generativeModel ?: return null
+        val systemPrompt = buildSystemPrompt(userGoal, serializedScreen)
         Log.d(TAG, "Sending prompt to Gemma: $systemPrompt")
 
-        // Generate content as raw text and parse JSON string manually using Kotlinx Serialization
         return try {
             val rawRequest = GenerateContentRequest.Builder(TextPart(systemPrompt)).build()
             val rawResponse = model.generateContent(rawRequest)
             val rawText = rawResponse.candidates.firstOrNull()?.text ?: ""
             Log.d(TAG, "Gemma Action output (Raw text): $rawText")
-
-            // Clean up Markdown JSON code-block wrapping if any
-            val cleanJson = cleanJsonString(rawText)
-            val action = jsonParser.decodeFromString<AgentAction>(cleanJson)
-            Log.d(TAG, "Gemma Action output (Parsed JSON Fallback): $action")
-            action
+            parseAction(rawText)
         } catch (e: Exception) {
             Log.e(TAG, "Failed reasoning action via raw JSON and fallback parsing", e)
             null

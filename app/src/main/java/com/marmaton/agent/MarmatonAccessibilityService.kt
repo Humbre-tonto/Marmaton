@@ -9,6 +9,8 @@ import android.util.Log
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
 import com.marmaton.agent.model.AgentAction
+import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlin.coroutines.resume
 
 class MarmatonAccessibilityService : AccessibilityService() {
 
@@ -42,7 +44,7 @@ class MarmatonAccessibilityService : AccessibilityService() {
     /**
      * Executes the parsed Action on the active screen structure.
      */
-    fun executeAction(action: AgentAction): Boolean {
+    suspend fun executeAction(action: AgentAction): Boolean {
         return try {
             when (action.actionType) {
                 "CLICK" -> performClickAction(action)
@@ -57,7 +59,7 @@ class MarmatonAccessibilityService : AccessibilityService() {
         }
     }
 
-    private fun performClickAction(action: AgentAction): Boolean {
+    private suspend fun performClickAction(action: AgentAction): Boolean {
         val targetId = action.targetId
         val boundsList = action.bounds
 
@@ -71,13 +73,15 @@ class MarmatonAccessibilityService : AccessibilityService() {
                     // Fallback to text search
                     targetNodes = root.findAccessibilityNodeInfosByText(targetId)
                 }
+                var clicked = false
                 for (node in targetNodes) {
-                    if (clickNodeOrParent(node)) {
-                        root.recycle()
-                        return true
+                    if (!clicked && clickNodeOrParent(node)) {
+                        clicked = true
                     }
+                    node.recycle() // Caller always recycles the retrieved list elements
                 }
                 root.recycle()
+                if (clicked) return true
             }
         }
 
@@ -97,66 +101,92 @@ class MarmatonAccessibilityService : AccessibilityService() {
 
     private fun clickNodeOrParent(node: AccessibilityNodeInfo?): Boolean {
         var current = node
+        var fetchedParent: AccessibilityNodeInfo? = null
         while (current != null) {
             if (current.isClickable) {
-                val success = current.performAction(AccessibilityNodeInfo.ACTION_CLICK)
-                if (success) {
-                    current.recycle()
+                if (current.performAction(AccessibilityNodeInfo.ACTION_CLICK)) {
+                    fetchedParent?.recycle()
                     return true
                 }
             }
             val parent = current.parent
-            current.recycle()
+            fetchedParent?.recycle()
+            fetchedParent = parent
             current = parent
         }
+        fetchedParent?.recycle()
         return false
     }
 
-    private fun clickCoordinates(x: Float, y: Float): Boolean {
-        val clickPath = Path().apply {
-            moveTo(x, y)
-        }
-        val gestureBuilder = GestureDescription.Builder()
-        val stroke = GestureDescription.StrokeDescription(clickPath, 0, 100)
-        gestureBuilder.addStroke(stroke)
-
-        var success = false
-        dispatchGesture(gestureBuilder.build(), object : GestureResultCallback() {
-            override fun onCompleted(gestureDescription: GestureDescription?) {
-                super.onCompleted(gestureDescription)
-                success = true
+    private suspend fun clickCoordinates(x: Float, y: Float): Boolean =
+        suspendCancellableCoroutine { cont ->
+            val clickPath = Path().apply {
+                moveTo(x, y)
             }
+            val gestureBuilder = GestureDescription.Builder()
+            val stroke = GestureDescription.StrokeDescription(clickPath, 0, 100)
+            gestureBuilder.addStroke(stroke)
 
-            override fun onCancelled(gestureDescription: GestureDescription?) {
-                super.onCancelled(gestureDescription)
-                success = false
+            try {
+                val ok = dispatchGesture(gestureBuilder.build(), object : GestureResultCallback() {
+                    override fun onCompleted(gestureDescription: GestureDescription?) {
+                        super.onCompleted(gestureDescription)
+                        cont.resume(true)
+                    }
+
+                    override fun onCancelled(gestureDescription: GestureDescription?) {
+                        super.onCancelled(gestureDescription)
+                        cont.resume(false)
+                    }
+                }, null)
+                if (!ok) {
+                    cont.resume(false)
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed dispatching gesture coordinate click", e)
+                cont.resume(false)
             }
-        }, null)
-
-        return true // Dispatched gesture successfully
-    }
-
-    private fun performSwipe(up: Boolean): Boolean {
-        val displayMetrics = resources.displayMetrics
-        val screenHeight = displayMetrics.heightPixels
-        val screenWidth = displayMetrics.widthPixels
-
-        val startX = screenWidth / 2f
-        val startY = if (up) screenHeight * 0.8f else screenHeight * 0.2f
-        val endY = if (up) screenHeight * 0.2f else screenHeight * 0.8f
-
-        val swipePath = Path().apply {
-            moveTo(startX, startY)
-            lineTo(startX, endY)
         }
 
-        val gestureBuilder = GestureDescription.Builder()
-        val stroke = GestureDescription.StrokeDescription(swipePath, 0, 500)
-        gestureBuilder.addStroke(stroke)
+    private suspend fun performSwipe(up: Boolean): Boolean =
+        suspendCancellableCoroutine { cont ->
+            val displayMetrics = resources.displayMetrics
+            val screenHeight = displayMetrics.heightPixels
+            val screenWidth = displayMetrics.widthPixels
 
-        dispatchGesture(gestureBuilder.build(), null, null)
-        return true
-    }
+            val startX = screenWidth / 2f
+            val startY = if (up) screenHeight * 0.8f else screenHeight * 0.2f
+            val endY = if (up) screenHeight * 0.2f else screenHeight * 0.8f
+
+            val swipePath = Path().apply {
+                moveTo(startX, startY)
+                lineTo(startX, endY)
+            }
+
+            val gestureBuilder = GestureDescription.Builder()
+            val stroke = GestureDescription.StrokeDescription(swipePath, 0, 500)
+            gestureBuilder.addStroke(stroke)
+
+            try {
+                val ok = dispatchGesture(gestureBuilder.build(), object : GestureResultCallback() {
+                    override fun onCompleted(gestureDescription: GestureDescription?) {
+                        super.onCompleted(gestureDescription)
+                        cont.resume(true)
+                    }
+
+                    override fun onCancelled(gestureDescription: GestureDescription?) {
+                        super.onCancelled(gestureDescription)
+                        cont.resume(false)
+                    }
+                }, null)
+                if (!ok) {
+                    cont.resume(false)
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed dispatching swipe gesture", e)
+                cont.resume(false)
+            }
+        }
 
     private fun performTypeAction(action: AgentAction): Boolean {
         val text = action.textToType ?: return false
@@ -194,7 +224,10 @@ class MarmatonAccessibilityService : AccessibilityService() {
                 AccessibilityNodeInfo.ACTION_SET_TEXT,
                 arguments
             )
-            targetNode.recycle()
+            // Guard before recycling to prevent double-recycle crash if targetNode == root
+            if (targetNode != root) {
+                targetNode.recycle()
+            }
             root.recycle()
             return success
         }

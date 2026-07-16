@@ -21,12 +21,15 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 class AgentForegroundService : Service() {
 
     private val job = Job()
     private val serviceScope = CoroutineScope(Dispatchers.Default + job)
+
+    private var loopJob: Job? = null
 
     companion object {
         private const val TAG = "AgentForegroundService"
@@ -44,12 +47,14 @@ class AgentForegroundService : Service() {
 
         fun log(message: String) {
             Log.d(TAG, message)
-            val currentList = _runLog.value.toMutableList()
-            currentList.add(message)
-            if (currentList.size > 200) { // Limit log size
-                currentList.removeAt(0)
+            _runLog.update { current ->
+                val next = current.toMutableList()
+                next.add(message)
+                if (next.size > 200) {
+                    next.removeAt(0)
+                }
+                next
             }
-            _runLog.value = currentList
         }
 
         fun startAgent(context: Context, goal: String) {
@@ -75,6 +80,13 @@ class AgentForegroundService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        // Handle stop action at the very top of onStartCommand to prevent driving state to running
+        if (intent?.action == "STOP_SERVICE") {
+            _isRunning.value = false
+            stopSelf()
+            return START_NOT_STICKY
+        }
+
         _isRunning.value = true
         log("[Service] Marmaton Agent Loop Started")
 
@@ -92,11 +104,6 @@ class AgentForegroundService : Service() {
             .setOngoing(true)
             .build()
 
-        if (intent?.action == "STOP_SERVICE") {
-            stopSelf()
-            return START_NOT_STICKY
-        }
-
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
         } else {
@@ -109,7 +116,12 @@ class AgentForegroundService : Service() {
     }
 
     private fun startAutonomousLoop() {
-        serviceScope.launch {
+        // Guard against multiple concurrent autonomous loops
+        if (loopJob?.isActive == true) {
+            return
+        }
+
+        loopJob = serviceScope.launch {
             while (_isRunning.value) {
                 val service = MarmatonAccessibilityService.instance
                 if (service == null) {
