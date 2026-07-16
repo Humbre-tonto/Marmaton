@@ -10,6 +10,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -21,14 +23,20 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.marmaton.agent.AgentForegroundService
 import com.marmaton.agent.MarmatonAccessibilityService
-import com.marmaton.agent.llm.GemmaAgentEngine
+import com.marmaton.agent.llm.*
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun DashboardScreen() {
+fun DashboardScreen(onNavigateToSettings: () -> Unit) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
+
+    val persistence = remember { SettingsPersistence(context) }
+    val config by persistence.configFlow.collectAsState(initial = BackendConfig())
+
+    var activeBackendStatus by remember { mutableStateOf<BackendStatus>(BackendStatus.NotReady("Checking status...")) }
+    var activeBackendDisplayName by remember { mutableStateOf("Local Model File") }
 
     val modelStatus by GemmaAgentEngine.modelStatus.collectAsState()
     val isDownloading by GemmaAgentEngine.isDownloading.collectAsState()
@@ -48,6 +56,20 @@ fun DashboardScreen() {
         }
     }
 
+    // Periodically check backend status
+    LaunchedEffect(config) {
+        while (true) {
+            val backend = BackendFactory.createBackend(context, config)
+            activeBackendDisplayName = backend.displayName
+            activeBackendStatus = try {
+                backend.status()
+            } catch (e: Throwable) {
+                BackendStatus.Unavailable(e.message ?: e.toString())
+            }
+            kotlinx.coroutines.delay(2000)
+        }
+    }
+
     val logListState = rememberLazyListState()
     LaunchedEffect(runLog.size) {
         if (runLog.isNotEmpty()) {
@@ -59,6 +81,11 @@ fun DashboardScreen() {
         topBar = {
             TopAppBar(
                 title = { Text("Marmaton AI Device Agent") },
+                actions = {
+                    IconButton(onClick = onNavigateToSettings) {
+                        Icon(imageVector = Icons.Default.Settings, contentDescription = "Settings")
+                    }
+                },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.primaryContainer,
                     titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer
@@ -73,36 +100,58 @@ fun DashboardScreen() {
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // Model Status Card
+            // LLM Backend Status Card
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Text(
-                        text = "Local AI Model Status",
+                        text = "Active LLM Backend",
                         style = MaterialTheme.typography.titleMedium,
                         color = MaterialTheme.colorScheme.primary
                     )
                     Spacer(modifier = Modifier.height(4.dp))
-                    Text(text = modelStatus, style = MaterialTheme.typography.bodyMedium)
+                    Text(
+                        text = "Selected: $activeBackendDisplayName",
+                        style = MaterialTheme.typography.titleSmall
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
 
-                    if (isDownloading) {
+                    val statusText = when (val status = activeBackendStatus) {
+                        is BackendStatus.Ready -> "Ready"
+                        is BackendStatus.NotReady -> "Not Ready: ${status.reason}"
+                        is BackendStatus.Unavailable -> "Unavailable: ${status.reason}"
+                    }
+
+                    val statusColor = when (activeBackendStatus) {
+                        is BackendStatus.Ready -> Color(0xFF2E7D32)
+                        is BackendStatus.NotReady -> Color(0xFFE65100)
+                        is BackendStatus.Unavailable -> MaterialTheme.colorScheme.error
+                    }
+
+                    Text(
+                        text = "Status: $statusText",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = statusColor
+                    )
+
+                    // For AICore backend specifically, let's keep the download buttons if relevant
+                    if (config.selectedType == BackendType.AICORE) {
                         Spacer(modifier = Modifier.height(8.dp))
-                        // Display clean indeterminate progress bar for smooth feedback during download
-                        LinearProgressIndicator(
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                    } else if (modelStatus.contains("ready") || modelStatus.contains("downloaded")) {
-                        // All set!
-                    } else if (modelStatus.contains("download") || modelStatus.contains("ready to be downloaded")) {
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Button(onClick = {
-                            coroutineScope.launch {
-                                GemmaAgentEngine.startDownload()
+                        Text(text = "AICore Internal Status: $modelStatus", style = MaterialTheme.typography.bodySmall)
+                        if (isDownloading) {
+                            Spacer(modifier = Modifier.height(8.dp))
+                            LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                        } else if (modelStatus.contains("download") || modelStatus.contains("ready to be downloaded")) {
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Button(onClick = {
+                                coroutineScope.launch {
+                                    GemmaAgentEngine.startDownload()
+                                }
+                            }) {
+                                Text("Download Gemma 4")
                             }
-                        }) {
-                            Text("Download Gemma 4")
                         }
                     }
                 }
@@ -158,12 +207,13 @@ fun DashboardScreen() {
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
+                        val isBackendReady = activeBackendStatus is BackendStatus.Ready
                         Button(
                             onClick = {
                                 AgentForegroundService.startAgent(context, userGoalInput)
                             },
                             modifier = Modifier.weight(1f),
-                            enabled = !isAgentRunning && isAccessibilityEnabled
+                            enabled = !isAgentRunning && isAccessibilityEnabled && isBackendReady
                         ) {
                             Text("Start Agent")
                         }
@@ -203,7 +253,7 @@ fun DashboardScreen() {
                         Text(
                             text = logLine,
                             color = when {
-                                logLine.contains("[Gemma]") -> Color(0xFF81C784)
+                                logLine.contains("[Reasoner]") || logLine.contains("[Gemma]") -> Color(0xFF81C784)
                                 logLine.contains("[Action]") -> Color(0xFF64B5F6)
                                 logLine.contains("[Error]") -> Color(0xFFE57373)
                                 else -> Color.White
