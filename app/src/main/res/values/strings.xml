@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">Marmaton Agent</string>
+    <string name="accessibility_service_label">Marmaton Autonomous AI Agent</string>
+    <string name="accessibility_service_description">Marmaton local AI agent accessibility service for autonomous work.</string>
+</resources>
