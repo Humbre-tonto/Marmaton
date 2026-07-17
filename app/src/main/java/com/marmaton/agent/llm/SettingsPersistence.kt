@@ -22,7 +22,9 @@ data class BackendConfig(
     val ollamaPort: Int = 11434,
     val ollamaModel: String = "gemma",
     val cloudBaseUrl: String = "https://api.openai.com",
-    val cloudModel: String = "gpt-4o-mini"
+    val cloudModel: String = "gpt-4o-mini",
+    val analyticsConsent: Boolean = false,
+    val firstRunTracked: Boolean = false
 )
 
 class SettingsPersistence(
@@ -41,6 +43,8 @@ class SettingsPersistence(
         private val KEY_OLLAMA_MODEL = stringPreferencesKey("ollama_model")
         private val KEY_CLOUD_BASE_URL = stringPreferencesKey("cloud_base_url")
         private val KEY_CLOUD_MODEL = stringPreferencesKey("cloud_model")
+        private val KEY_ANALYTICS_CONSENT = booleanPreferencesKey("analytics_consent")
+        private val KEY_FIRST_RUN_TRACKED = booleanPreferencesKey("first_run_tracked")
     }
 
     val configFlow: Flow<BackendConfig> = dataStore.data.map { preferences ->
@@ -60,7 +64,9 @@ class SettingsPersistence(
             ollamaPort = preferences[KEY_OLLAMA_PORT] ?: 11434,
             ollamaModel = preferences[KEY_OLLAMA_MODEL] ?: "gemma",
             cloudBaseUrl = preferences[KEY_CLOUD_BASE_URL] ?: "https://api.openai.com",
-            cloudModel = preferences[KEY_CLOUD_MODEL] ?: "gpt-4o-mini"
+            cloudModel = preferences[KEY_CLOUD_MODEL] ?: "gpt-4o-mini",
+            analyticsConsent = preferences[KEY_ANALYTICS_CONSENT] ?: false,
+            firstRunTracked = preferences[KEY_FIRST_RUN_TRACKED] ?: false
         )
     }
 
@@ -90,6 +96,18 @@ class SettingsPersistence(
         dataStore.edit { preferences ->
             preferences[KEY_CLOUD_BASE_URL] = baseUrl
             preferences[KEY_CLOUD_MODEL] = model
+        }
+    }
+
+    suspend fun updateAnalyticsConsent(consent: Boolean) {
+        dataStore.edit { preferences ->
+            preferences[KEY_ANALYTICS_CONSENT] = consent
+        }
+    }
+
+    suspend fun updateFirstRunTracked(tracked: Boolean) {
+        dataStore.edit { preferences ->
+            preferences[KEY_FIRST_RUN_TRACKED] = tracked
         }
     }
 }

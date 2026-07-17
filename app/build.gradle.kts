@@ -41,7 +41,17 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
+
+    val postHogApiKey = (project.findProperty("POSTHOG_API_KEY") as? String) ?: System.getenv("POSTHOG_API_KEY") ?: ""
+    val postHogHost = (project.findProperty("POSTHOG_HOST") as? String) ?: System.getenv("POSTHOG_HOST") ?: "https://eu.i.posthog.com"
+
+    defaultConfig {
+        buildConfigField("String", "POSTHOG_API_KEY", "\"$postHogApiKey\"")
+        buildConfigField("String", "POSTHOG_HOST", "\"$postHogHost\"")
+    }
+
     packaging {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
@@ -50,6 +60,7 @@ android {
 }
 
 dependencies {
+    implementation(libs.posthog.android)
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.activity.compose)

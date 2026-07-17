@@ -366,6 +366,63 @@ fun SettingsScreen(onBack: () -> Unit) {
                     }
                 }
             }
+
+            // Section 3: Privacy & Data Usage Consent
+            Card(modifier = Modifier.fillMaxWidth()) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text(
+                        text = "Privacy & Data",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "Marmaton is local-first and privacy-respecting. We do not collect your data, screen contents, or keys.",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Share anonymous usage data",
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                            Text(
+                                text = "Helps us know which inference backend/model you are using (never sends keys, prompts, or screen text).",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Switch(
+                            checked = config.analyticsConsent,
+                            onCheckedChange = { checked ->
+                                coroutineScope.launch {
+                                    persistence.updateAnalyticsConsent(checked)
+                                    // Withdrawing consent immediately stops tracking and calls reset()
+                                    com.marmaton.agent.analytics.Analytics.get().setEnabled(checked)
+                                    config = persistence.configFlow.first()
+                                }
+                            }
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+                    TextButton(
+                        onClick = {
+                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://marmaton.ai/privacy"))
+                            context.startActivity(intent)
+                        },
+                        contentPadding = PaddingValues(0.dp)
+                    ) {
+                        Text("View our Privacy Policy")
+                    }
+                }
+            }
         }
     }
 }
