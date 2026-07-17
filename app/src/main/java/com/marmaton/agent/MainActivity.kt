@@ -3,6 +3,7 @@ package com.marmaton.agent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
@@ -22,14 +23,12 @@ import com.marmaton.agent.llm.SettingsPersistence
 import com.marmaton.agent.ui.*
 import com.marmaton.agent.ui.theme.IonVioletTheme
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.runBlocking
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
         val persistence = SettingsPersistence(this)
-        val initialConfig = runBlocking { persistence.configFlow.first() }
 
         setContent {
             IonVioletTheme {
@@ -37,92 +36,107 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    val navController = rememberNavController()
-                    val startDestination = if (initialConfig.isOnboardingCompleted) {
-                        "home"
-                    } else {
-                        "onboarding"
+                    var configState by remember { mutableStateOf<BackendConfig?>(null) }
+                    LaunchedEffect(Unit) {
+                        configState = persistence.configFlow.first()
                     }
 
-                    NavHost(
-                        navController = navController,
-                        startDestination = startDestination
-                    ) {
-                        composable("onboarding") {
-                            OnboardingScreen(
-                                onFinished = {
-                                    navController.navigate("home") {
-                                        popUpTo("onboarding") { inclusive = true }
-                                    }
-                                }
-                            )
+                    val config = configState
+                    if (config == null) {
+                        Box(
+                            modifier = Modifier.fillMaxSize(),
+                            contentAlignment = androidx.compose.ui.Alignment.Center
+                        ) {
+                            CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
+                        }
+                    } else {
+                        val navController = rememberNavController()
+                        val startDestination = if (config.isOnboardingCompleted) {
+                            "home"
+                        } else {
+                            "onboarding"
                         }
 
-                        composable("home") {
-                            MainBottomNavigationWrapper(
-                                currentTab = "home",
-                                onTabSelected = { tab ->
-                                    if (tab != "home") {
-                                        navController.navigate(tab) {
-                                            popUpTo("home") { saveState = true }
-                                            launchSingleTop = true
-                                            restoreState = true
+                        NavHost(
+                            navController = navController,
+                            startDestination = startDestination
+                        ) {
+                            composable("onboarding") {
+                                OnboardingScreen(
+                                    onFinished = {
+                                        navController.navigate("home") {
+                                            popUpTo("onboarding") { inclusive = true }
                                         }
                                     }
-                                }
-                            ) {
-                                HomeControlScreen()
-                            }
-                        }
-
-                        composable("activity") {
-                            MainBottomNavigationWrapper(
-                                currentTab = "activity",
-                                onTabSelected = { tab ->
-                                    if (tab != "activity") {
-                                        navController.navigate(tab) {
-                                            popUpTo("home") { saveState = true }
-                                            launchSingleTop = true
-                                            restoreState = true
-                                        }
-                                    }
-                                }
-                            ) {
-                                ActivityLogScreen()
-                            }
-                        }
-
-                        composable("backends") {
-                            MainBottomNavigationWrapper(
-                                currentTab = "backends",
-                                onTabSelected = { tab ->
-                                    if (tab != "backends") {
-                                        navController.navigate(tab) {
-                                            popUpTo("home") { saveState = true }
-                                            launchSingleTop = true
-                                            restoreState = true
-                                        }
-                                    }
-                                }
-                            ) {
-                                BackendsListScreen(
-                                    onNavigateToLocalDetail = { navController.navigate("local_detail") },
-                                    onNavigateToOllamaDetail = { navController.navigate("ollama_detail") },
-                                    onNavigateToCloudDetail = { navController.navigate("cloud_detail") }
                                 )
                             }
-                        }
 
-                        composable("local_detail") {
-                            LocalBackendDetailScreen(onBack = { navController.popBackStack() })
-                        }
+                            composable("home") {
+                                MainBottomNavigationWrapper(
+                                    currentTab = "home",
+                                    onTabSelected = { tab ->
+                                        if (tab != "home") {
+                                            navController.navigate(tab) {
+                                                popUpTo("home") { saveState = true }
+                                                launchSingleTop = true
+                                                restoreState = true
+                                            }
+                                        }
+                                    }
+                                ) {
+                                    HomeControlScreen()
+                                }
+                            }
 
-                        composable("ollama_detail") {
-                            OllamaBackendDetailScreen(onBack = { navController.popBackStack() })
-                        }
+                            composable("activity") {
+                                MainBottomNavigationWrapper(
+                                    currentTab = "activity",
+                                    onTabSelected = { tab ->
+                                        if (tab != "activity") {
+                                            navController.navigate(tab) {
+                                                popUpTo("home") { saveState = true }
+                                                launchSingleTop = true
+                                                restoreState = true
+                                            }
+                                        }
+                                    }
+                                ) {
+                                    ActivityLogScreen()
+                                }
+                            }
 
-                        composable("cloud_detail") {
-                            CloudBackendDetailScreen(onBack = { navController.popBackStack() })
+                            composable("backends") {
+                                MainBottomNavigationWrapper(
+                                    currentTab = "backends",
+                                    onTabSelected = { tab ->
+                                        if (tab != "backends") {
+                                            navController.navigate(tab) {
+                                                popUpTo("home") { saveState = true }
+                                                launchSingleTop = true
+                                                restoreState = true
+                                            }
+                                        }
+                                    }
+                                ) {
+                                    BackendsListScreen(
+                                        onNavigateToLocalDetail = { navController.navigate("local_detail") },
+                                        onNavigateToOllamaDetail = { navController.navigate("ollama_detail") },
+                                        onNavigateToCloudDetail = { navController.navigate("cloud_detail") }
+                                    )
+                                }
+                            }
+
+                            composable("local_detail") {
+                                LocalBackendDetailScreen(onBack = { navController.popBackStack() })
+                            }
+
+                            composable("ollama_detail") {
+                                OllamaBackendDetailScreen(onBack = { navController.popBackStack() })
+                            }
+
+                            composable("cloud_detail") {
+                                CloudBackendDetailScreen(onBack = { navController.popBackStack() })
+                            }
                         }
                     }
                 }

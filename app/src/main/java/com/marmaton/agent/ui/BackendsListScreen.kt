@@ -49,6 +49,7 @@ fun BackendsListScreen(
     onNavigateToCloudDetail: () -> Unit
 ) {
     val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
     val persistence = remember { SettingsPersistence(context) }
     val config by persistence.configFlow.collectAsState(initial = BackendConfig())
 
@@ -57,11 +58,8 @@ fun BackendsListScreen(
     var cloudStatusText by remember { mutableStateOf("not configured") }
 
     LaunchedEffect(config) {
-        val localBackend = LocalFileBackend(context, config.localModelFilePath)
-        localStatusText = when (localBackend.status()) {
-            is BackendStatus.Ready -> "ready"
-            else -> "not ready"
-        }
+        val hasLocalFile = config.localModelFilePath.isNotBlank() && File(config.localModelFilePath).exists()
+        localStatusText = if (hasLocalFile) "ready" else "not ready"
 
         val ollamaBackend = OllamaBackend(config.ollamaScheme, config.ollamaHost, config.ollamaPort, config.ollamaModel)
         ollamaStatusText = when (ollamaBackend.status()) {
@@ -84,16 +82,27 @@ fun BackendsListScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
-                .padding(Spacing.space16),
+                .padding(Spacing.space16)
+                .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(Spacing.space16)
         ) {
             // Local file Card
+            val localSubtitle = if (config.localModelFileName.isNotBlank()) {
+                config.localModelFileName
+            } else {
+                stringResource(R.string.backends_on_device_subtitle)
+            }
             BackendRowCard(
                 title = stringResource(R.string.backends_on_device_title),
-                subtitle = stringResource(R.string.backends_on_device_subtitle),
+                subtitle = localSubtitle,
                 isActive = config.selectedType == BackendType.LOCAL_FILE,
                 status = localStatusText,
-                onClick = onNavigateToLocalDetail
+                onClick = onNavigateToLocalDetail,
+                onSetActive = {
+                    coroutineScope.launch {
+                        persistence.updateSelectedType(BackendType.LOCAL_FILE)
+                    }
+                }
             )
 
             // Ollama Card
@@ -102,7 +111,12 @@ fun BackendsListScreen(
                 subtitle = "${config.ollamaHost}:${config.ollamaPort} · ${config.ollamaModel}",
                 isActive = config.selectedType == BackendType.OLLAMA,
                 status = ollamaStatusText,
-                onClick = onNavigateToOllamaDetail
+                onClick = onNavigateToOllamaDetail,
+                onSetActive = {
+                    coroutineScope.launch {
+                        persistence.updateSelectedType(BackendType.OLLAMA)
+                    }
+                }
             )
 
             // Cloud API Card
@@ -111,8 +125,81 @@ fun BackendsListScreen(
                 subtitle = if (cloudStatusText == "ready") stringResource(R.string.backends_cloud_configured) else stringResource(R.string.backends_cloud_not_configured),
                 isActive = config.selectedType == BackendType.CLOUD,
                 status = cloudStatusText,
-                onClick = onNavigateToCloudDetail
+                onClick = onNavigateToCloudDetail,
+                onSetActive = {
+                    coroutineScope.launch {
+                        persistence.updateSelectedType(BackendType.CLOUD)
+                    }
+                }
             )
+
+            Spacer(modifier = Modifier.height(Spacing.space8))
+
+            // Privacy & Analytics Consent Toggle Card (Coordinated with PR #7)
+            ElevatedCard(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(Radii.lg20),
+                colors = CardDefaults.elevatedCardColors(
+                    containerColor = MaterialTheme.colorScheme.surface
+                )
+            ) {
+                Column(
+                    modifier = Modifier.padding(Spacing.space20),
+                    verticalArrangement = Arrangement.spacedBy(Spacing.space12)
+                ) {
+                    Text(
+                        text = "Privacy & Analytics",
+                        style = IonVioletTypography.title,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Share anonymous usage data",
+                                style = IonVioletTypography.body,
+                                color = MaterialTheme.colorScheme.onBackground
+                            )
+                            Text(
+                                text = "Help improve Marmaton by sharing diagnostic info.",
+                                style = IonVioletTypography.bodySm,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+
+                        Switch(
+                            checked = config.analyticsConsent,
+                            onCheckedChange = { consent ->
+                                coroutineScope.launch {
+                                    persistence.updateAnalyticsConsent(consent)
+                                }
+                            }
+                        )
+                    }
+
+                    Text(
+                        text = "Privacy Policy",
+                        style = IonVioletTypography.label.copy(
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary
+                        ),
+                        modifier = Modifier
+                            .clickable {
+                                try {
+                                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://marmaton.ai/privacy"))
+                                    context.startActivity(intent)
+                                } catch (e: Exception) {
+                                    Log.e("BackendsListScreen", "Failed to open privacy policy link", e)
+                                }
+                            }
+                            .padding(vertical = Spacing.space4)
+                    )
+                }
+            }
         }
     }
 }
@@ -123,23 +210,36 @@ fun BackendRowCard(
     subtitle: String,
     isActive: Boolean,
     status: String,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    onSetActive: () -> Unit
 ) {
     ElevatedCard(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable { onClick() },
+        modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(Radii.lg20),
         colors = CardDefaults.elevatedCardColors(
             containerColor = MaterialTheme.colorScheme.surface
         )
     ) {
         Row(
-            modifier = Modifier.padding(Spacing.space20),
+            modifier = Modifier.padding(Spacing.space16),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            Column(modifier = Modifier.weight(1f)) {
+            // Radio button to Set Active
+            RadioButton(
+                selected = isActive,
+                onClick = onSetActive,
+                colors = RadioButtonDefaults.colors(
+                    selectedColor = MaterialTheme.colorScheme.primary
+                ),
+                modifier = Modifier.padding(end = Spacing.space4)
+            )
+
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .clickable { onClick() }
+            ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(Spacing.space8)
@@ -198,11 +298,13 @@ fun BackendRowCard(
                 }
             }
 
-            Icon(
-                imageVector = Icons.AutoMirrored.Filled.ArrowForward,
-                contentDescription = "Details",
-                tint = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+            IconButton(onClick = onClick) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                    contentDescription = "Details",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
         }
     }
 }
@@ -237,6 +339,18 @@ fun LocalBackendDetailScreen(onBack: () -> Unit) {
         }
     }
 
+    fun getFileName(uri: Uri): String {
+        return try {
+            context.contentResolver.query(uri, null, null, null, null)?.use { cursor ->
+                val nameIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+                cursor.moveToFirst()
+                cursor.getString(nameIndex)
+            } ?: "imported_model.task"
+        } catch (e: Exception) {
+            "imported_model.task"
+        }
+    }
+
     suspend fun importModelFile(uri: Uri) {
         isImporting = true
         importProgress = 0f
@@ -245,6 +359,7 @@ fun LocalBackendDetailScreen(onBack: () -> Unit) {
         withContext(Dispatchers.IO) {
             try {
                 val totalSize = getFileSize(uri)
+                val fileName = getFileName(uri)
                 val destFile = File(context.filesDir, "imported_model.task")
                 if (destFile.exists()) {
                     destFile.delete()
@@ -263,7 +378,7 @@ fun LocalBackendDetailScreen(onBack: () -> Unit) {
                         }
                     }
                 }
-                persistence.updateLocalModel(destFile.absolutePath, uri.toString())
+                persistence.updateLocalModel(destFile.absolutePath, uri.toString(), fileName)
                 config = persistence.configFlow.first()
                 importSuccess = true
             } catch (e: Exception) {
@@ -325,6 +440,12 @@ fun LocalBackendDetailScreen(onBack: () -> Unit) {
                     )
 
                     Text(
+                        text = "Name: ${config.localModelFileName.ifBlank { "gemma-3n-e4b" }}",
+                        style = IonVioletTypography.body,
+                        color = MaterialTheme.colorScheme.onBackground
+                    )
+
+                    Text(
                         text = "Path: ${config.localModelFilePath.ifBlank { "Not Imported" }}",
                         style = IonVioletTypography.mono,
                         color = MaterialTheme.colorScheme.onBackground
@@ -372,6 +493,27 @@ fun LocalBackendDetailScreen(onBack: () -> Unit) {
 
                     if (importSuccess) {
                         Text(text = "Success!", color = Color(0xFF2E7D32), style = IonVioletTypography.bodySm)
+                    }
+
+                    Spacer(modifier = Modifier.height(Spacing.space8))
+
+                    // Button inside details to Set as Active
+                    if (config.selectedType != BackendType.LOCAL_FILE) {
+                        Button(
+                            onClick = {
+                                coroutineScope.launch {
+                                    persistence.updateSelectedType(BackendType.LOCAL_FILE)
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(Radii.pill100),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.primaryContainer,
+                                contentColor = MaterialTheme.colorScheme.primary
+                            )
+                        ) {
+                            Text("Set as active backend", style = IonVioletTypography.title)
+                        }
                     }
                 }
             }
@@ -493,6 +635,27 @@ fun OllamaBackendDetailScreen(onBack: () -> Unit) {
                             style = IonVioletTypography.bodySm
                         )
                     }
+
+                    Spacer(modifier = Modifier.height(Spacing.space8))
+
+                    // Button inside details to Set as Active
+                    if (config.selectedType != BackendType.OLLAMA) {
+                        Button(
+                            onClick = {
+                                coroutineScope.launch {
+                                    persistence.updateSelectedType(BackendType.OLLAMA)
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(Radii.pill100),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.primaryContainer,
+                                contentColor = MaterialTheme.colorScheme.primary
+                            )
+                        ) {
+                            Text("Set as active backend", style = IonVioletTypography.title)
+                        }
+                    }
                 }
             }
         }
@@ -506,13 +669,14 @@ fun CloudBackendDetailScreen(onBack: () -> Unit) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
     val persistence = remember { SettingsPersistence(context) }
+    var config by remember { mutableStateOf(BackendConfig()) }
 
     var urlInput by remember { mutableStateOf("https://api.openai.com") }
     var modelInput by remember { mutableStateOf("gpt-4o-mini") }
     var apiInput by remember { mutableStateOf("") }
 
     LaunchedEffect(Unit) {
-        val config = persistence.configFlow.first()
+        config = persistence.configFlow.first()
         urlInput = config.cloudBaseUrl
         modelInput = config.cloudModel
         apiInput = SecurePreferences.getApiKey(context)
@@ -581,6 +745,27 @@ fun CloudBackendDetailScreen(onBack: () -> Unit) {
                         style = IonVioletTypography.bodySm,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
+
+                    Spacer(modifier = Modifier.height(Spacing.space8))
+
+                    // Button inside details to Set as Active
+                    if (config.selectedType != BackendType.CLOUD) {
+                        Button(
+                            onClick = {
+                                coroutineScope.launch {
+                                    persistence.updateSelectedType(BackendType.CLOUD)
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(Radii.pill100),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.primaryContainer,
+                                contentColor = MaterialTheme.colorScheme.primary
+                            )
+                        ) {
+                            Text("Set as active backend", style = IonVioletTypography.title)
+                        }
+                    }
                 }
             }
         }

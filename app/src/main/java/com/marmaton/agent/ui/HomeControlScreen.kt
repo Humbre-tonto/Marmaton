@@ -77,14 +77,14 @@ fun HomeControlScreen() {
     // Periodically check active backend status
     LaunchedEffect(config) {
         while (true) {
-            val backend = BackendFactory.createBackend(context, config)
+            val backend = BackendFactory.createActiveBackend(context)
             activeBackendDisplayName = backend.displayName
             activeBackendStatus = try {
                 backend.status()
             } catch (e: Throwable) {
                 BackendStatus.Unavailable(e.message ?: e.toString())
             }
-            delay(2000)
+            delay(5000)
         }
     }
 

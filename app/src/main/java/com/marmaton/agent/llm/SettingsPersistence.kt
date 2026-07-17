@@ -17,13 +17,16 @@ data class BackendConfig(
     val selectedType: BackendType = BackendType.LOCAL_FILE,
     val localModelFilePath: String = "",
     val localModelUri: String = "",
+    val localModelFileName: String = "",
     val ollamaScheme: String = "http",
     val ollamaHost: String = "10.0.2.2",
     val ollamaPort: Int = 11434,
     val ollamaModel: String = "gemma",
     val cloudBaseUrl: String = "https://api.openai.com",
     val cloudModel: String = "gpt-4o-mini",
-    val isOnboardingCompleted: Boolean = false
+    val isOnboardingCompleted: Boolean = false,
+    val analyticsConsent: Boolean = false,
+    val firstRunTracked: Boolean = false
 )
 
 class SettingsPersistence(
@@ -36,6 +39,7 @@ class SettingsPersistence(
         private val KEY_SELECTED_TYPE = stringPreferencesKey("selected_backend")
         private val KEY_LOCAL_MODEL_FILE_PATH = stringPreferencesKey("local_model_file_path")
         private val KEY_LOCAL_MODEL_URI = stringPreferencesKey("local_model_uri")
+        private val KEY_LOCAL_MODEL_FILE_NAME = stringPreferencesKey("local_model_file_name")
         private val KEY_OLLAMA_SCHEME = stringPreferencesKey("ollama_scheme")
         private val KEY_OLLAMA_HOST = stringPreferencesKey("ollama_host")
         private val KEY_OLLAMA_PORT = intPreferencesKey("ollama_port")
@@ -43,6 +47,8 @@ class SettingsPersistence(
         private val KEY_CLOUD_BASE_URL = stringPreferencesKey("cloud_base_url")
         private val KEY_CLOUD_MODEL = stringPreferencesKey("cloud_model")
         private val KEY_ONBOARDING_COMPLETED = booleanPreferencesKey("onboarding_completed")
+        private val KEY_ANALYTICS_CONSENT = booleanPreferencesKey("analytics_consent")
+        private val KEY_FIRST_RUN_TRACKED = booleanPreferencesKey("first_run_tracked")
     }
 
     val configFlow: Flow<BackendConfig> = dataStore.data.map { preferences ->
@@ -57,13 +63,16 @@ class SettingsPersistence(
             selectedType = selectedType,
             localModelFilePath = preferences[KEY_LOCAL_MODEL_FILE_PATH] ?: "",
             localModelUri = preferences[KEY_LOCAL_MODEL_URI] ?: "",
+            localModelFileName = preferences[KEY_LOCAL_MODEL_FILE_NAME] ?: "",
             ollamaScheme = preferences[KEY_OLLAMA_SCHEME] ?: "http",
             ollamaHost = preferences[KEY_OLLAMA_HOST] ?: "10.0.2.2",
             ollamaPort = preferences[KEY_OLLAMA_PORT] ?: 11434,
             ollamaModel = preferences[KEY_OLLAMA_MODEL] ?: "gemma",
             cloudBaseUrl = preferences[KEY_CLOUD_BASE_URL] ?: "https://api.openai.com",
             cloudModel = preferences[KEY_CLOUD_MODEL] ?: "gpt-4o-mini",
-            isOnboardingCompleted = preferences[KEY_ONBOARDING_COMPLETED] ?: false
+            isOnboardingCompleted = preferences[KEY_ONBOARDING_COMPLETED] ?: false,
+            analyticsConsent = preferences[KEY_ANALYTICS_CONSENT] ?: false,
+            firstRunTracked = preferences[KEY_FIRST_RUN_TRACKED] ?: false
         )
     }
 
@@ -79,10 +88,11 @@ class SettingsPersistence(
         }
     }
 
-    suspend fun updateLocalModel(filePath: String, uri: String) {
+    suspend fun updateLocalModel(filePath: String, uri: String, fileName: String) {
         dataStore.edit { preferences ->
             preferences[KEY_LOCAL_MODEL_FILE_PATH] = filePath
             preferences[KEY_LOCAL_MODEL_URI] = uri
+            preferences[KEY_LOCAL_MODEL_FILE_NAME] = fileName
         }
     }
 
@@ -99,6 +109,18 @@ class SettingsPersistence(
         dataStore.edit { preferences ->
             preferences[KEY_CLOUD_BASE_URL] = baseUrl
             preferences[KEY_CLOUD_MODEL] = model
+        }
+    }
+
+    suspend fun updateAnalyticsConsent(consent: Boolean) {
+        dataStore.edit { preferences ->
+            preferences[KEY_ANALYTICS_CONSENT] = consent
+        }
+    }
+
+    suspend fun updateFirstRunTracked(tracked: Boolean) {
+        dataStore.edit { preferences ->
+            preferences[KEY_FIRST_RUN_TRACKED] = tracked
         }
     }
 }
