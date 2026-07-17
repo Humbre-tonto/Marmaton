@@ -17,14 +17,7 @@ class MarmatonApplication : Application() {
     @OptIn(FlowPreview::class)
     override fun onCreate() {
         super.onCreate()
-        val consent = runBlocking {
-            try {
-                SettingsPersistence(this@MarmatonApplication).configFlow.first().analyticsConsent
-            } catch (e: Exception) {
-                false
-            }
-        }
-        Analytics.init(this, consent)
+        Analytics.init(this, false)
 
         // Run background configuration collection to sync consent, track first-run and track changes
         val scope = CoroutineScope(Dispatchers.Default)
@@ -75,12 +68,16 @@ fun getBackendSelectedDetails(config: BackendConfig): Triple<String, String, Str
     }
     val modelName = when (config.selectedType) {
         BackendType.LOCAL_FILE -> {
-            val path = config.localModelFilePath
-            if (path.isBlank()) {
-                "unknown"
+            if (config.localModelFileName.isNotBlank()) {
+                config.localModelFileName
             } else {
-                val file = java.io.File(path)
-                file.name.ifBlank { "unknown" }
+                val path = config.localModelFilePath
+                if (path.isBlank()) {
+                    "unknown"
+                } else {
+                    val file = java.io.File(path)
+                    file.name.ifBlank { "unknown" }
+                }
             }
         }
         BackendType.AICORE -> "gemini-nano"

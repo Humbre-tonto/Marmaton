@@ -30,6 +30,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
 class AgentForegroundService : Service() {
@@ -233,7 +234,12 @@ class AgentForegroundService : Service() {
                     BackendType.CLOUD -> "cloud"
                     null -> "unknown"
                 }
-                val outcome = if (isSuccess) "success" else "error"
+                val isCancelled = !_isRunning.value || !isActive
+                val outcome = when {
+                    isSuccess -> "success"
+                    isCancelled -> "stopped"
+                    else -> "error"
+                }
                 Analytics.get().trackRunCompleted(type, outcome, stepCount, durationMs)
             }
         }

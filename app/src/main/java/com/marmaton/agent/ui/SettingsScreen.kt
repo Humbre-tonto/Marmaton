@@ -50,6 +50,19 @@ fun SettingsScreen(onBack: () -> Unit) {
         apiKey = SecurePreferences.getApiKey(context)
     }
 
+    // Helper for SAF file name
+    fun getFileName(uri: Uri): String {
+        return try {
+            context.contentResolver.query(uri, null, null, null, null)?.use { cursor ->
+                val nameIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+                cursor.moveToFirst()
+                cursor.getString(nameIndex)
+            } ?: ""
+        } catch (e: Exception) {
+            ""
+        }
+    }
+
     // Helper for SAF file sizing
     fun getFileSize(uri: Uri): Long {
         return try {
@@ -72,6 +85,7 @@ fun SettingsScreen(onBack: () -> Unit) {
         withContext(Dispatchers.IO) {
             try {
                 val totalSize = getFileSize(uri)
+                val fileName = getFileName(uri)
                 val destFile = File(context.filesDir, "imported_model.task")
                 if (destFile.exists()) {
                     destFile.delete()
@@ -90,7 +104,7 @@ fun SettingsScreen(onBack: () -> Unit) {
                         }
                     }
                 }
-                persistence.updateLocalModel(destFile.absolutePath, uri.toString())
+                persistence.updateLocalModel(destFile.absolutePath, uri.toString(), fileName)
                 // Reload config state
                 config = persistence.configFlow.first()
                 importSuccess = true

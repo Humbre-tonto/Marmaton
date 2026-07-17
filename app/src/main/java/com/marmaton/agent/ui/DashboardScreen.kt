@@ -21,6 +21,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.material3.Switch
+import androidx.compose.foundation.layout.PaddingValues
+import android.net.Uri
 import com.marmaton.agent.AgentForegroundService
 import com.marmaton.agent.MarmatonAccessibilityService
 import com.marmaton.agent.llm.*
@@ -182,6 +185,60 @@ fun DashboardScreen(onNavigateToSettings: () -> Unit) {
                         }) {
                             Text("Open Settings")
                         }
+                    }
+                }
+            }
+
+            // Privacy & Data Consent Card
+            Card(modifier = Modifier.fillMaxWidth()) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text(
+                        text = "Privacy & Data",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "Marmaton is local-first and privacy-respecting. We never collect keys, prompts, or screen text.",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Share anonymous usage data",
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                            Text(
+                                text = "Helps us improve. Anonymous only, no personal data.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Switch(
+                            checked = config.analyticsConsent,
+                            onCheckedChange = { checked ->
+                                coroutineScope.launch {
+                                    persistence.updateAnalyticsConsent(checked)
+                                    com.marmaton.agent.analytics.Analytics.get().setEnabled(checked)
+                                }
+                            }
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+                    val localUri = Uri.parse("https://marmaton.ai/privacy")
+                    TextButton(
+                        onClick = {
+                            val intent = Intent(Intent.ACTION_VIEW, localUri)
+                            context.startActivity(intent)
+                        },
+                        contentPadding = PaddingValues(0.dp)
+                    ) {
+                        Text("View our Privacy Policy")
                     }
                 }
             }

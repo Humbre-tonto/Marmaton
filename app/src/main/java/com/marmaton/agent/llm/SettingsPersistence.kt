@@ -17,6 +17,7 @@ data class BackendConfig(
     val selectedType: BackendType = BackendType.LOCAL_FILE,
     val localModelFilePath: String = "",
     val localModelUri: String = "",
+    val localModelFileName: String = "",
     val ollamaScheme: String = "http",
     val ollamaHost: String = "10.0.2.2",
     val ollamaPort: Int = 11434,
@@ -37,6 +38,7 @@ class SettingsPersistence(
         private val KEY_SELECTED_TYPE = stringPreferencesKey("selected_backend")
         private val KEY_LOCAL_MODEL_FILE_PATH = stringPreferencesKey("local_model_file_path")
         private val KEY_LOCAL_MODEL_URI = stringPreferencesKey("local_model_uri")
+        private val KEY_LOCAL_MODEL_FILE_NAME = stringPreferencesKey("local_model_file_name")
         private val KEY_OLLAMA_SCHEME = stringPreferencesKey("ollama_scheme")
         private val KEY_OLLAMA_HOST = stringPreferencesKey("ollama_host")
         private val KEY_OLLAMA_PORT = intPreferencesKey("ollama_port")
@@ -59,6 +61,7 @@ class SettingsPersistence(
             selectedType = selectedType,
             localModelFilePath = preferences[KEY_LOCAL_MODEL_FILE_PATH] ?: "",
             localModelUri = preferences[KEY_LOCAL_MODEL_URI] ?: "",
+            localModelFileName = preferences[KEY_LOCAL_MODEL_FILE_NAME] ?: "",
             ollamaScheme = preferences[KEY_OLLAMA_SCHEME] ?: "http",
             ollamaHost = preferences[KEY_OLLAMA_HOST] ?: "10.0.2.2",
             ollamaPort = preferences[KEY_OLLAMA_PORT] ?: 11434,
@@ -76,10 +79,11 @@ class SettingsPersistence(
         }
     }
 
-    suspend fun updateLocalModel(filePath: String, uri: String) {
+    suspend fun updateLocalModel(filePath: String, uri: String, fileName: String = "") {
         dataStore.edit { preferences ->
             preferences[KEY_LOCAL_MODEL_FILE_PATH] = filePath
             preferences[KEY_LOCAL_MODEL_URI] = uri
+            preferences[KEY_LOCAL_MODEL_FILE_NAME] = fileName
         }
     }
 

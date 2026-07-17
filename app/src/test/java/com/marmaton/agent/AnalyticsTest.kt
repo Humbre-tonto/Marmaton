@@ -4,6 +4,7 @@ import com.marmaton.agent.llm.BackendConfig
 import com.marmaton.agent.llm.BackendType
 import org.junit.Assert.*
 import org.junit.Test
+import org.mockito.kotlin.mock
 
 class AnalyticsTest {
 
@@ -58,6 +59,31 @@ class AnalyticsTest {
         }
     }
 
+    class FakePostHogProvider : com.marmaton.agent.analytics.PostHogProvider {
+        var optInCount = 0
+        var optOutCount = 0
+        var resetCount = 0
+        val capturedEvents = mutableListOf<CapturedEvent>()
+
+        data class CapturedEvent(val event: String, val properties: Map<String, Any>?)
+
+        override fun capture(event: String, properties: Map<String, Any>?) {
+            capturedEvents.add(CapturedEvent(event, properties))
+        }
+
+        override fun optIn() {
+            optInCount++
+        }
+
+        override fun optOut() {
+            optOutCount++
+        }
+
+        override fun reset() {
+            resetCount++
+        }
+    }
+
     @Test
     fun testConsentOffEmitsNoEvents() {
         val sink = TestAnalyticsSink()
@@ -96,6 +122,51 @@ class AnalyticsTest {
         // Post-toggle check: tracking should do nothing
         sink.trackFirstRun()
         assertTrue(sink.capturedEvents.isEmpty())
+    }
+
+    @Test
+    fun testPostHogAnalyticsSinkGatingWithRealSinkAndFakeProvider() {
+        val mockContext = mock<android.content.Context>()
+        val mockAppContext = mock<android.content.Context>()
+        org.mockito.kotlin.whenever(mockContext.applicationContext).thenReturn(mockAppContext)
+
+        val fakeProvider = FakePostHogProvider()
+
+        // 1. Initialized with consent off
+        val sink = com.marmaton.agent.analytics.PostHogAnalyticsSink(
+            context = mockContext,
+            apiKey = "test-api-key",
+            host = "test-host",
+            consentEnabled = false,
+            postHog = fakeProvider
+        )
+
+        // Should call optOut and reset on initialization since consent is off
+        assertEquals(1, fakeProvider.optOutCount)
+        assertEquals(1, fakeProvider.resetCount)
+        assertEquals(0, fakeProvider.optInCount)
+
+        // Tracking should do nothing because consent is off
+        sink.trackFirstRun()
+        assertTrue(fakeProvider.capturedEvents.isEmpty())
+
+        // 2. Enable Consent
+        sink.setEnabled(true)
+        assertEquals(1, fakeProvider.optInCount)
+
+        // Track when consent is on
+        sink.trackFirstRun()
+        assertEquals(1, fakeProvider.capturedEvents.size)
+        assertEquals("app_first_run", fakeProvider.capturedEvents[0].event)
+
+        // 3. Disable Consent again
+        sink.setEnabled(false)
+        assertEquals(2, fakeProvider.optOutCount)
+        assertEquals(2, fakeProvider.resetCount)
+
+        // Track when consent is toggled off
+        sink.trackFirstRun()
+        assertEquals(1, fakeProvider.capturedEvents.size) // No new event added
     }
 
     @Test
@@ -147,6 +218,20 @@ class AnalyticsTest {
 
         assertEquals("on_device", type)
         assertEquals("imported_model.task", modelName) // Derive name from filename only
+        assertNull(providerHost)
+    }
+
+    @Test
+    fun testGetBackendSelectedDetailsOnDeviceWithOriginalName() {
+        val config = BackendConfig(
+            selectedType = BackendType.LOCAL_FILE,
+            localModelFilePath = "/data/user/0/com.marmaton.agent/files/imported_model.task",
+            localModelFileName = "qwen2.5-0.5b-instruct.task"
+        )
+        val (type, modelName, providerHost) = getBackendSelectedDetails(config)
+
+        assertEquals("on_device", type)
+        assertEquals("qwen2.5-0.5b-instruct.task", modelName) // Prefer original filename if present
         assertNull(providerHost)
     }
 }
