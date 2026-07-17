@@ -12,6 +12,9 @@ import android.os.Build
 import android.os.IBinder
 import android.util.Log
 import androidx.core.app.NotificationCompat
+import com.marmaton.agent.llm.AgentReasoner
+import com.marmaton.agent.llm.BackendFactory
+import com.marmaton.agent.llm.BackendStatus
 import com.marmaton.agent.llm.GemmaAgentEngine
 import com.marmaton.agent.parser.ScreenTreeParser
 import kotlinx.coroutines.CoroutineScope
@@ -146,17 +149,35 @@ class AgentForegroundService : Service() {
                 val serializedScreen = ScreenTreeParser.serializeTree(rootNode)
                 rootNode.recycle()
 
-                log("[Gemma] Analyzing screen state and reasoning next action...")
+                log("[Reasoner] Analyzing screen state and reasoning next action...")
                 val goal = _userGoal.value
-                val action = GemmaAgentEngine.reasonAction(goal, serializedScreen)
+                val action = try {
+                    val backend = BackendFactory.createActiveBackend(service)
+                    val status = backend.status()
+                    if (status !is BackendStatus.Ready) {
+                        val reason = when (status) {
+                            is BackendStatus.NotReady -> status.reason
+                            is BackendStatus.Unavailable -> status.reason
+                            else -> "Unknown status"
+                        }
+                        log("[Error] Active backend is not ready: $reason")
+                        null
+                    } else {
+                        val reasoner = AgentReasoner(backend)
+                        reasoner.reason(goal, serializedScreen)
+                    }
+                } catch (e: Throwable) {
+                    log("[Error] Backend error: ${e.message ?: e.toString()}")
+                    null
+                }
 
                 if (action == null) {
-                    log("[Gemma] Reasoning failed or timed out. Waiting...")
+                    log("[Reasoner] Reasoning failed, backend not ready, or timed out. Waiting...")
                     delay(4000)
                     continue
                 }
 
-                log("[Gemma] Think: ${action.reasoning}")
+                log("[Reasoner] Think: ${action.reasoning}")
                 log("[Action] Decision: ${action.actionType} | Target: ${action.targetId ?: "N/A"} | Bounds: ${action.bounds ?: "N/A"}")
 
                 when (action.actionType) {
@@ -188,6 +209,7 @@ class AgentForegroundService : Service() {
         super.onDestroy()
         _isRunning.value = false
         job.cancel()
+        BackendFactory.closeCurrent()
         log("[Service] Marmaton Agent Loop Stopped Safely")
     }
 

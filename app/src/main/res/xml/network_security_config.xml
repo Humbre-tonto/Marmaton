@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <!-- Permit cleartext only for private LAN ranges (10/8, 172.16/12, 192.168/16) and localhost -->
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="true">localhost</domain>
+        <domain includeSubdomains="true">10.0.2.2</domain>
+        <domain includeSubdomains="true">127.0.0.1</domain>
+        <!-- Reverse DNS style or direct IP host match if supported by underlying components -->
+        <domain includeSubdomains="true">10.in-addr.arpa</domain>
+        <domain includeSubdomains="true">168.192.in-addr.arpa</domain>
+        <domain includeSubdomains="true">16.172.in-addr.arpa</domain>
+        <domain includeSubdomains="true">17.172.in-addr.arpa</domain>
+        <domain includeSubdomains="true">18.172.in-addr.arpa</domain>
+        <domain includeSubdomains="true">19.172.in-addr.arpa</domain>
+        <domain includeSubdomains="true">20.172.in-addr.arpa</domain>
+        <domain includeSubdomains="true">21.172.in-addr.arpa</domain>
+        <domain includeSubdomains="true">22.172.in-addr.arpa</domain>
+        <domain includeSubdomains="true">23.172.in-addr.arpa</domain>
+        <domain includeSubdomains="true">24.172.in-addr.arpa</domain>
+        <domain includeSubdomains="true">25.172.in-addr.arpa</domain>
+        <domain includeSubdomains="true">26.172.in-addr.arpa</domain>
+        <domain includeSubdomains="true">27.172.in-addr.arpa</domain>
+        <domain includeSubdomains="true">28.172.in-addr.arpa</domain>
+        <domain includeSubdomains="true">29.172.in-addr.arpa</domain>
+        <domain includeSubdomains="true">30.172.in-addr.arpa</domain>
+        <domain includeSubdomains="true">31.172.in-addr.arpa</domain>
+    </domain-config>
+</network-security-config>

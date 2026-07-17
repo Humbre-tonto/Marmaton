@@ -1,0 +1,95 @@
+package com.marmaton.agent.llm
+
+import android.content.Context
+import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.*
+import androidx.datastore.preferences.preferencesDataStore
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
+
+val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "marmaton_settings")
+
+enum class BackendType {
+    LOCAL_FILE, OLLAMA, CLOUD, AICORE
+}
+
+data class BackendConfig(
+    val selectedType: BackendType = BackendType.LOCAL_FILE,
+    val localModelFilePath: String = "",
+    val localModelUri: String = "",
+    val ollamaScheme: String = "http",
+    val ollamaHost: String = "10.0.2.2",
+    val ollamaPort: Int = 11434,
+    val ollamaModel: String = "gemma",
+    val cloudBaseUrl: String = "https://api.openai.com",
+    val cloudModel: String = "gpt-4o-mini"
+)
+
+class SettingsPersistence(
+    private val context: Context,
+    private val customDataStore: DataStore<Preferences>? = null
+) {
+    private val dataStore = customDataStore ?: context.dataStore
+
+    companion object {
+        private val KEY_SELECTED_TYPE = stringPreferencesKey("selected_backend")
+        private val KEY_LOCAL_MODEL_FILE_PATH = stringPreferencesKey("local_model_file_path")
+        private val KEY_LOCAL_MODEL_URI = stringPreferencesKey("local_model_uri")
+        private val KEY_OLLAMA_SCHEME = stringPreferencesKey("ollama_scheme")
+        private val KEY_OLLAMA_HOST = stringPreferencesKey("ollama_host")
+        private val KEY_OLLAMA_PORT = intPreferencesKey("ollama_port")
+        private val KEY_OLLAMA_MODEL = stringPreferencesKey("ollama_model")
+        private val KEY_CLOUD_BASE_URL = stringPreferencesKey("cloud_base_url")
+        private val KEY_CLOUD_MODEL = stringPreferencesKey("cloud_model")
+    }
+
+    val configFlow: Flow<BackendConfig> = dataStore.data.map { preferences ->
+        val typeStr = preferences[KEY_SELECTED_TYPE] ?: BackendType.LOCAL_FILE.name
+        val selectedType = try {
+            BackendType.valueOf(typeStr)
+        } catch (e: Exception) {
+            BackendType.LOCAL_FILE
+        }
+
+        BackendConfig(
+            selectedType = selectedType,
+            localModelFilePath = preferences[KEY_LOCAL_MODEL_FILE_PATH] ?: "",
+            localModelUri = preferences[KEY_LOCAL_MODEL_URI] ?: "",
+            ollamaScheme = preferences[KEY_OLLAMA_SCHEME] ?: "http",
+            ollamaHost = preferences[KEY_OLLAMA_HOST] ?: "10.0.2.2",
+            ollamaPort = preferences[KEY_OLLAMA_PORT] ?: 11434,
+            ollamaModel = preferences[KEY_OLLAMA_MODEL] ?: "gemma",
+            cloudBaseUrl = preferences[KEY_CLOUD_BASE_URL] ?: "https://api.openai.com",
+            cloudModel = preferences[KEY_CLOUD_MODEL] ?: "gpt-4o-mini"
+        )
+    }
+
+    suspend fun updateSelectedType(type: BackendType) {
+        dataStore.edit { preferences ->
+            preferences[KEY_SELECTED_TYPE] = type.name
+        }
+    }
+
+    suspend fun updateLocalModel(filePath: String, uri: String) {
+        dataStore.edit { preferences ->
+            preferences[KEY_LOCAL_MODEL_FILE_PATH] = filePath
+            preferences[KEY_LOCAL_MODEL_URI] = uri
+        }
+    }
+
+    suspend fun updateOllamaConfig(scheme: String, host: String, port: Int, model: String) {
+        dataStore.edit { preferences ->
+            preferences[KEY_OLLAMA_SCHEME] = scheme
+            preferences[KEY_OLLAMA_HOST] = host
+            preferences[KEY_OLLAMA_PORT] = port
+            preferences[KEY_OLLAMA_MODEL] = model
+        }
+    }
+
+    suspend fun updateCloudConfig(baseUrl: String, model: String) {
+        dataStore.edit { preferences ->
+            preferences[KEY_CLOUD_BASE_URL] = baseUrl
+            preferences[KEY_CLOUD_MODEL] = model
+        }
+    }
+}

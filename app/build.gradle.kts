@@ -62,6 +62,18 @@ dependencies {
     // ML Kit GenAI Prompt API
     implementation(libs.google.mlkit.genai.prompt)
 
+    // MediaPipe GenAI (LLM Inference)
+    implementation(libs.google.mediapipe.genai)
+
+    // DataStore Preferences
+    implementation(libs.androidx.datastore.preferences)
+
+    // Security Crypto (for EncryptedSharedPreferences)
+    implementation(libs.androidx.security.crypto)
+
+    // OkHttp Client
+    implementation(libs.okhttp.core)
+
     // Kotlinx Serialization
     implementation(libs.kotlinx.serialization.json)
 
@@ -69,6 +81,7 @@ dependencies {
     testImplementation(libs.mockito.core)
     testImplementation(libs.mockito.kotlin)
     testImplementation(libs.kotlinx.coroutines.test)
+    testImplementation(libs.okhttp.mockwebserver)
 
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
