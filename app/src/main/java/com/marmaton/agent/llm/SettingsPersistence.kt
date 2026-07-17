@@ -22,7 +22,8 @@ data class BackendConfig(
     val ollamaPort: Int = 11434,
     val ollamaModel: String = "gemma",
     val cloudBaseUrl: String = "https://api.openai.com",
-    val cloudModel: String = "gpt-4o-mini"
+    val cloudModel: String = "gpt-4o-mini",
+    val isOnboardingCompleted: Boolean = false
 )
 
 class SettingsPersistence(
@@ -41,6 +42,7 @@ class SettingsPersistence(
         private val KEY_OLLAMA_MODEL = stringPreferencesKey("ollama_model")
         private val KEY_CLOUD_BASE_URL = stringPreferencesKey("cloud_base_url")
         private val KEY_CLOUD_MODEL = stringPreferencesKey("cloud_model")
+        private val KEY_ONBOARDING_COMPLETED = booleanPreferencesKey("onboarding_completed")
     }
 
     val configFlow: Flow<BackendConfig> = dataStore.data.map { preferences ->
@@ -60,8 +62,15 @@ class SettingsPersistence(
             ollamaPort = preferences[KEY_OLLAMA_PORT] ?: 11434,
             ollamaModel = preferences[KEY_OLLAMA_MODEL] ?: "gemma",
             cloudBaseUrl = preferences[KEY_CLOUD_BASE_URL] ?: "https://api.openai.com",
-            cloudModel = preferences[KEY_CLOUD_MODEL] ?: "gpt-4o-mini"
+            cloudModel = preferences[KEY_CLOUD_MODEL] ?: "gpt-4o-mini",
+            isOnboardingCompleted = preferences[KEY_ONBOARDING_COMPLETED] ?: false
         )
+    }
+
+    suspend fun updateOnboardingCompleted(completed: Boolean) {
+        dataStore.edit { preferences ->
+            preferences[KEY_ONBOARDING_COMPLETED] = completed
+        }
     }
 
     suspend fun updateSelectedType(type: BackendType) {
