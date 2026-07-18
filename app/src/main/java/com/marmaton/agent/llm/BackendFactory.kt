@@ -34,9 +34,10 @@ object BackendFactory {
     }
 
     private fun closeCurrentLocked() {
-        val current = cachedBackend
-        if (current is LocalFileBackend) {
-            current.close()
+        try {
+            cachedBackend?.close()
+        } catch (e: Exception) {
+            // Safe fallback
         }
         cachedBackend = null
         cachedConfig = null

@@ -1,9 +1,10 @@
 package com.marmaton.agent.llm
 
-interface LlmBackend {
+interface LlmBackend : java.lang.AutoCloseable {
     val displayName: String
     suspend fun status(): BackendStatus
     suspend fun generate(prompt: String): String
+    override fun close() {}
 }
 
 sealed interface BackendStatus {

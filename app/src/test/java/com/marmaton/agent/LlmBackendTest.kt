@@ -33,6 +33,7 @@ class LlmBackendTest {
                     }
                 """.trimIndent()
             }
+            override fun close() {}
         }
 
         val reasoner = AgentReasoner(fakeBackend)
@@ -51,6 +52,7 @@ class LlmBackendTest {
             override suspend fun generate(prompt: String): String {
                 return "This is pure conversational garbage with no JSON whatsoever!"
             }
+            override fun close() {}
         }
 
         val reasoner = AgentReasoner(fakeBackend)
@@ -137,7 +139,7 @@ class LlmBackendTest {
         settings.updateSelectedType(BackendType.OLLAMA)
         settings.updateOllamaConfig("https", "192.168.1.10", 11434, "llama3")
         settings.updateCloudConfig("https://custom-cloud.ai", "deepseek-coder")
-        settings.updateLocalModel("/path/to/model", "content://saf/uri")
+        settings.updateLocalModel("/path/to/model", "content://saf/uri", "test_model.task")
 
         // Read updated values
         val updatedConfig = settings.configFlow.first()
@@ -150,5 +152,6 @@ class LlmBackendTest {
         assertEquals("deepseek-coder", updatedConfig.cloudModel)
         assertEquals("/path/to/model", updatedConfig.localModelFilePath)
         assertEquals("content://saf/uri", updatedConfig.localModelUri)
+        assertEquals("test_model.task", updatedConfig.localModelFileName)
     }
 }

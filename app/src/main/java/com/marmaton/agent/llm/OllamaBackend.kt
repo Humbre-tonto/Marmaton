@@ -27,12 +27,12 @@ class OllamaBackend(
     private val baseUrl: String
         get() = "$scheme://$host:$port"
 
-    override suspend fun status(): BackendStatus {
+    override suspend fun status(): BackendStatus = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
         if (host.isBlank()) {
-            return BackendStatus.NotReady("Ollama host is empty. Please configure in Settings.")
+            return@withContext BackendStatus.NotReady("Ollama host is empty. Please configure in Settings.")
         }
         if (modelName.isBlank()) {
-            return BackendStatus.NotReady("Ollama model name is empty. Please configure in Settings.")
+            return@withContext BackendStatus.NotReady("Ollama model name is empty. Please configure in Settings.")
         }
 
         val request = Request.Builder()
@@ -40,7 +40,7 @@ class OllamaBackend(
             .get()
             .build()
 
-        return try {
+        try {
             client.newCall(request).execute().use { response ->
                 if (response.isSuccessful) {
                     val bodyString = response.body?.string() ?: ""
@@ -113,9 +113,13 @@ class OllamaBackend(
                     val msg = firstChoice?.get("message")?.jsonObject
                     msg?.get("content")?.jsonPrimitive?.content ?: throw IOException("Could not parse Ollama response")
                 } catch (ex: Exception) {
-                    throw IOException("Failed to parse Ollama response: $responseBody", e)
+                    throw IOException("Failed to parse Ollama response: $responseBody", ex)
                 }
             }
         }
+    }
+
+    override fun close() {
+        // OkHttpClient does not need explicit close under standard usage
     }
 }

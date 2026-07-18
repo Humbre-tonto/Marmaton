@@ -12,10 +12,13 @@ import android.os.Build
 import android.os.IBinder
 import android.util.Log
 import androidx.core.app.NotificationCompat
+import com.marmaton.agent.analytics.Analytics
 import com.marmaton.agent.llm.AgentReasoner
+import com.marmaton.agent.llm.BackendConfig
 import com.marmaton.agent.llm.BackendFactory
 import com.marmaton.agent.llm.BackendStatus
-import com.marmaton.agent.llm.GemmaAgentEngine
+import com.marmaton.agent.llm.BackendType
+import com.marmaton.agent.llm.SettingsPersistence
 import com.marmaton.agent.parser.ScreenTreeParser
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -24,7 +27,9 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
 class AgentForegroundService : Service() {
@@ -125,82 +130,121 @@ class AgentForegroundService : Service() {
         }
 
         loopJob = serviceScope.launch {
-            while (_isRunning.value) {
-                val service = MarmatonAccessibilityService.instance
-                if (service == null) {
-                    log("[Service] Waiting for Marmaton Accessibility Service to be enabled...")
-                    delay(5000)
-                    continue
-                }
+            var stepCount = 0
+            val startTime = System.currentTimeMillis()
+            var isSuccess = false
+            var wasExceptionThrown = false
+            val backendConfig = try {
+                SettingsPersistence(applicationContext).configFlow.first()
+            } catch (e: Exception) {
+                null
+            }
 
-                log("[Parser] Traversing screen elements...")
-                val rootNode = try {
-                    service.rootInActiveWindow
-                } catch (e: Exception) {
-                    null
-                }
+            if (backendConfig != null) {
+                val (type, modelName, providerHost) = getBackendSelectedDetails(backendConfig)
+                Analytics.get().trackBackendSelected(type, modelName, providerHost)
+            }
 
-                if (rootNode == null) {
-                    log("[Parser] Active window is empty/null. Retrying...")
-                    delay(3000)
-                    continue
-                }
+            try {
+                while (_isRunning.value) {
+                    val service = MarmatonAccessibilityService.instance
+                    if (service == null) {
+                        log("[Service] Waiting for Marmaton Accessibility Service to be enabled...")
+                        delay(5000)
+                        continue
+                    }
 
-                val serializedScreen = ScreenTreeParser.serializeTree(rootNode)
-                rootNode.recycle()
-
-                log("[Reasoner] Analyzing screen state and reasoning next action...")
-                val goal = _userGoal.value
-                val action = try {
-                    val backend = BackendFactory.createActiveBackend(service)
-                    val status = backend.status()
-                    if (status !is BackendStatus.Ready) {
-                        val reason = when (status) {
-                            is BackendStatus.NotReady -> status.reason
-                            is BackendStatus.Unavailable -> status.reason
-                            else -> "Unknown status"
-                        }
-                        log("[Error] Active backend is not ready: $reason")
+                    log("[Parser] Traversing screen elements...")
+                    val rootNode = try {
+                        service.rootInActiveWindow
+                    } catch (e: Exception) {
                         null
-                    } else {
-                        val reasoner = AgentReasoner(backend)
-                        reasoner.reason(goal, serializedScreen)
                     }
-                } catch (e: Throwable) {
-                    log("[Error] Backend error: ${e.message ?: e.toString()}")
-                    null
-                }
 
-                if (action == null) {
-                    log("[Reasoner] Reasoning failed, backend not ready, or timed out. Waiting...")
-                    delay(4000)
-                    continue
-                }
-
-                log("[Reasoner] Think: ${action.reasoning}")
-                log("[Action] Decision: ${action.actionType} | Target: ${action.targetId ?: "N/A"} | Bounds: ${action.bounds ?: "N/A"}")
-
-                when (action.actionType) {
-                    "FINISHED" -> {
-                        log("[Agent] Goal Successfully Achieved! Stopping loop.")
-                        _isRunning.value = false
-                        stopSelf()
-                        break
-                    }
-                    "WAIT" -> {
-                        log("[Action] Waiting for 3 seconds...")
+                    if (rootNode == null) {
+                        log("[Parser] Active window is empty/null. Retrying...")
                         delay(3000)
+                        continue
                     }
-                    else -> {
-                        val dispatched = service.executeAction(action)
-                        if (dispatched) {
-                            log("[Action] Action executed successfully.")
+
+                    val serializedScreen = ScreenTreeParser.serializeTree(rootNode)
+                    rootNode.recycle()
+
+                    log("[Reasoner] Analyzing screen state and reasoning next action...")
+                    val goal = _userGoal.value
+                    val action = try {
+                        val backend = BackendFactory.createActiveBackend(service)
+                        val status = backend.status()
+                        if (status !is BackendStatus.Ready) {
+                            val reason = when (status) {
+                                is BackendStatus.NotReady -> status.reason
+                                is BackendStatus.Unavailable -> status.reason
+                                else -> "Unknown status"
+                            }
+                            log("[Error] Active backend is not ready: $reason")
+                            null
                         } else {
-                            log("[Action] Warning: Action dispatch returned false/failed.")
+                            val reasoner = AgentReasoner(backend)
+                            reasoner.reason(goal, serializedScreen)
                         }
-                        delay(3000) // Delay to let screen render new state
+                    } catch (e: Throwable) {
+                        log("[Error] Backend error: ${e.message ?: e.toString()}")
+                        null
+                    }
+
+                    if (action == null) {
+                        log("[Reasoner] Reasoning failed, backend not ready, or timed out. Waiting...")
+                        delay(4000)
+                        continue
+                    }
+
+                    stepCount++
+
+                    log("[Reasoner] Think: ${action.reasoning}")
+                    log("[Action] Decision: ${action.actionType} | Target: ${action.targetId ?: "N/A"} | Bounds: ${action.bounds ?: "N/A"}")
+
+                    when (action.actionType) {
+                        "FINISHED" -> {
+                            log("[Agent] Goal Successfully Achieved! Stopping loop.")
+                            isSuccess = true
+                            _isRunning.value = false
+                            stopSelf()
+                            break
+                        }
+                        "WAIT" -> {
+                            log("[Action] Waiting for 3 seconds...")
+                            delay(3000)
+                        }
+                        else -> {
+                            val dispatched = service.executeAction(action)
+                            if (dispatched) {
+                                log("[Action] Action executed successfully.")
+                            } else {
+                                log("[Action] Warning: Action dispatch returned false/failed.")
+                            }
+                            delay(3000) // Delay to let screen render new state
+                        }
                     }
                 }
+            } catch (e: Exception) {
+                Log.e(TAG, "Exception during autonomous loop", e)
+                wasExceptionThrown = true
+            } finally {
+                val durationMs = System.currentTimeMillis() - startTime
+                val type = when (backendConfig?.selectedType) {
+                    BackendType.LOCAL_FILE, BackendType.AICORE -> "on_device"
+                    BackendType.OLLAMA -> "ollama"
+                    BackendType.CLOUD -> "cloud"
+                    null -> "unknown"
+                }
+                val isCancelled = !_isRunning.value || !isActive
+                val outcome = when {
+                    isSuccess -> "success"
+                    isCancelled -> "stopped"
+                    wasExceptionThrown -> "error"
+                    else -> "stopped"
+                }
+                Analytics.get().trackRunCompleted(type, outcome, stepCount, durationMs)
             }
         }
     }
