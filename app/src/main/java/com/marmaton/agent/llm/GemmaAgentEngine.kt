@@ -16,6 +16,11 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonNull
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 
 object GemmaAgentEngine {
     private const val TAG = "GemmaAgentEngine"
@@ -137,6 +142,9 @@ object GemmaAgentEngine {
                "reasoning": "your step-by-step reasoning"
             }
 
+            Output ONLY the JSON object — no markdown, no code fences, no extra text.
+            "bounds" must be exactly four plain integers, e.g. [852, 134, 1036, 266] — never strings or quoted numbers.
+
             Strategy:
             1. If you see a button, switch, or field matching the goal, return CLICK with the correct bounds or target ID.
             2. If you need to scroll down/up to find more settings/options, output SWIPE_DOWN or SWIPE_UP.
@@ -155,7 +163,19 @@ object GemmaAgentEngine {
     fun parseAction(rawText: String): AgentAction? {
         return try {
             val cleanJson = cleanJsonString(rawText)
-            jsonParser.decodeFromString<AgentAction>(cleanJson)
+            // Parse tolerantly instead of strict decoding: small on-device models emit valid JSON
+            // whose field shapes vary (e.g. bounds as ["852, 134, 1036, 266"] — a single string —
+            // or a comma string, rather than four ints). Extract each field defensively.
+            val obj = jsonParser.parseToJsonElement(cleanJson).jsonObject
+            val actionType = obj["actionType"]?.jsonPrimitive?.contentOrNull?.trim()?.uppercase()
+                ?: return null
+            AgentAction(
+                actionType = actionType,
+                targetId = obj["targetId"].asCleanString(),
+                bounds = coerceBounds(obj["bounds"]),
+                textToType = obj["textToType"].asCleanString(),
+                reasoning = obj["reasoning"].asCleanString() ?: ""
+            )
         } catch (e: Exception) {
             try {
                 Log.e(TAG, "Failed parsing action JSON", e)
@@ -165,6 +185,26 @@ object GemmaAgentEngine {
             }
             null
         }
+    }
+
+    /** A string field, or null for missing/blank/"null" values. */
+    private fun JsonElement?.asCleanString(): String? {
+        if (this == null || this is JsonNull) return null
+        val s = (this as? kotlinx.serialization.json.JsonPrimitive)?.contentOrNull ?: return null
+        return if (s.isBlank() || s.equals("null", ignoreCase = true)) null else s
+    }
+
+    /**
+     * Coerce a bounds value into [left, top, right, bottom] regardless of how the model formatted
+     * it — an int array, a single comma-joined string, an array containing one such string, etc.
+     * Pulls the first four integers out of the raw JSON; returns null if fewer than four are found.
+     */
+    private fun coerceBounds(element: JsonElement?): List<Int>? {
+        if (element == null || element is JsonNull) return null
+        val nums = Regex("-?\\d+").findAll(element.toString())
+            .mapNotNull { it.value.toIntOrNull() }
+            .toList()
+        return if (nums.size >= 4) nums.take(4) else null
     }
 
     suspend fun reasonAction(userGoal: String, serializedScreen: String): AgentAction? {
