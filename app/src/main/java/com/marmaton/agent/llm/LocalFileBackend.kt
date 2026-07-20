@@ -65,7 +65,13 @@ class LocalFileBackend(
             initEngine()
             BackendStatus.Ready
         } catch (e: Exception) {
-            BackendStatus.Unavailable("Failed to load model: ${e.message}")
+            val msg = e.message ?: ""
+            val friendly = if (msg.contains("zip archive", ignoreCase = true) || msg.contains("104")) {
+                "This model file can't be opened by the on-device engine — it's likely a web build or an incompatible/corrupted .task. Delete it and download a different model (Gemma 3 1B works)."
+            } else {
+                "Failed to load model: $msg"
+            }
+            BackendStatus.Unavailable(friendly)
         }
     }
 
