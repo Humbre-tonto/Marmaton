@@ -29,13 +29,16 @@ class GgufBackend(
             }
         }
 
-        @JvmStatic
+        // NOT @JvmStatic: the JNI functions in llama-jni.cpp are exported for the companion
+        // object (Java_com_marmaton_agent_llm_GgufBackend_00024Companion_load). @JvmStatic would
+        // hoist these onto the GgufBackend class, so the runtime would look for
+        // Java_com_marmaton_agent_llm_GgufBackend_load — which doesn't exist → UnsatisfiedLinkError
+        // ("No implementation found for ... load"). Keeping them as companion methods matches the
+        // native symbol names.
         private external fun load(modelPath: String, nCtx: Int, nThreads: Int): Long
 
-        @JvmStatic
         private external fun generate(handle: Long, prompt: String, maxTokens: Int): String
 
-        @JvmStatic
         private external fun free(handle: Long)
     }
 
