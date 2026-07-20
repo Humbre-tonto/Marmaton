@@ -135,8 +135,10 @@ class ModelDownloadService : Service() {
 
         val token = SecurePreferences.getHuggingFaceToken(applicationContext)
 
-        // The catalog's exact filename can drift and 404. If it does, look up a real .task file
-        // in the model's Hugging Face repo and download that instead.
+        // The catalog's exact filename can drift and 404 (Hugging Face repos re-name or shard
+        // quant files). If it does, look up a real file of the same kind (.gguf or .task) in the
+        // model's Hugging Face repo and download that instead.
+        val wantExtension = if (model.fileName.endsWith(".gguf", ignoreCase = true)) ".gguf" else ".task"
         var effectiveUrl = model.url
         var effectiveFileName = model.fileName
         val headCode = try {
@@ -147,12 +149,17 @@ class ModelDownloadService : Service() {
             null
         }
         if (headCode == 404) {
-            val resolved = resolveRealTaskFile(client, model.url, token)
+            val resolved = resolveRealModelFile(client, model.url, token, wantExtension)
             if (resolved != null) {
                 effectiveUrl = resolved.first
                 effectiveFileName = resolved.second
             } else {
-                fail("No Android-compatible file was found for ${model.name}. It may only be published as a web build — try Gemma 3 1B or another model.")
+                fail(
+                    if (wantExtension == ".gguf")
+                        "No compatible GGUF file was found for ${model.name} in its Hugging Face repo. Try another model."
+                    else
+                        "No Android-compatible file was found for ${model.name}. It may only be published as a web build — try Qwen 2.5 1.5B or another model."
+                )
                 return
             }
         }
@@ -284,13 +291,18 @@ class ModelDownloadService : Service() {
     }
 
     /**
-     * When the catalog URL 404s, query the Hugging Face API for the repo's real `.task` files and
-     * pick a suitable one (preferring non-web q8 → q4 → first). Returns (downloadUrl, fileName).
+     * When the catalog URL 404s, query the Hugging Face API for the repo's real files of the
+     * requested [extension] and pick a suitable one. Returns (downloadUrl, fileName).
+     *
+     * For `.gguf` we prefer a single-file quant (q4_k_m → q4_0 → q5_k_m → q8_0 → first) and skip
+     * multi-part shards (names containing `-of-`), which the loader can't stitch together. For
+     * `.task` we skip web builds the on-device engine can't open and prefer q8 → q4.
      */
-    private fun resolveRealTaskFile(
+    private fun resolveRealModelFile(
         client: OkHttpClient,
         originalUrl: String,
-        token: String
+        token: String,
+        extension: String
     ): Pair<String, String>? {
         val repoId = Regex("huggingface\\.co/(.+?)/resolve/")
             .find(originalUrl)?.groupValues?.getOrNull(1) ?: return null
@@ -301,22 +313,34 @@ class ModelDownloadService : Service() {
                 if (!resp.isSuccessful) return null
                 val bodyStr = resp.body?.string() ?: return null
                 val siblings = org.json.JSONObject(bodyStr).optJSONArray("siblings") ?: return null
-                val tasks = ArrayList<String>()
+                val files = ArrayList<String>()
                 for (i in 0 until siblings.length()) {
                     val f = siblings.optJSONObject(i)?.optString("rfilename") ?: continue
-                    if (f.endsWith(".task")) tasks.add(f)
+                    if (f.endsWith(extension, ignoreCase = true)) files.add(f)
                 }
-                if (tasks.isEmpty()) return null
-                // Web variants can't be opened by the on-device engine — never fall back to one.
-                val candidates = tasks.filterNot { it.contains("web", ignoreCase = true) }
-                if (candidates.isEmpty()) return null
-                val chosen = candidates.firstOrNull { it.contains("q8", ignoreCase = true) }
-                    ?: candidates.firstOrNull { it.contains("q4", ignoreCase = true) }
-                    ?: candidates.first()
+                if (files.isEmpty()) return null
+
+                val chosen = if (extension == ".gguf") {
+                    // Skip sharded quants — we can only download a single self-contained file.
+                    val single = files.filterNot { it.contains("-of-", ignoreCase = true) }
+                    if (single.isEmpty()) return null
+                    single.firstOrNull { it.contains("q4_k_m", ignoreCase = true) }
+                        ?: single.firstOrNull { it.contains("q4_0", ignoreCase = true) }
+                        ?: single.firstOrNull { it.contains("q5_k_m", ignoreCase = true) }
+                        ?: single.firstOrNull { it.contains("q8_0", ignoreCase = true) }
+                        ?: single.first()
+                } else {
+                    // Web variants can't be opened by the on-device engine — never fall back to one.
+                    val candidates = files.filterNot { it.contains("web", ignoreCase = true) }
+                    if (candidates.isEmpty()) return null
+                    candidates.firstOrNull { it.contains("q8", ignoreCase = true) }
+                        ?: candidates.firstOrNull { it.contains("q4", ignoreCase = true) }
+                        ?: candidates.first()
+                }
                 Pair("https://huggingface.co/$repoId/resolve/main/$chosen?download=true", chosen)
             }
         } catch (e: Exception) {
-            Log.w(TAG, "Failed to resolve real .task file from HF API", e)
+            Log.w(TAG, "Failed to resolve real $extension file from HF API", e)
             null
         }
     }
