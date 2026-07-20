@@ -388,7 +388,9 @@ fun LocalBackendDetailScreen(onBack: () -> Unit) {
             try {
                 val totalSize = getFileSize(uri)
                 val fileName = getFileName(uri)
-                val destFile = File(context.filesDir, "imported_model.task")
+                val isGguf = fileName.endsWith(".gguf", ignoreCase = true)
+                val destFileName = if (isGguf) "imported_model.gguf" else "imported_model.task"
+                val destFile = File(context.filesDir, destFileName)
                 if (destFile.exists()) {
                     destFile.delete()
                 }

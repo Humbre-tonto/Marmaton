@@ -59,6 +59,36 @@ object ModelCatalog {
             description = "Highest quality — needs a recent high-end device with plenty of RAM and storage.",
             gated = true,
             licenseUrl = "https://huggingface.co/litert-community/Gemma3-4B-IT"
+        ),
+        CatalogModel(
+            id = "qwen2.5-0.5b-it-gguf",
+            name = "Qwen 2.5 0.5B · Instruct GGUF (q4_k_m)",
+            fileName = "qwen2.5-0.5b-instruct-q4_k_m.gguf",
+            url = "https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct-GGUF/resolve/main/qwen2.5-0.5b-instruct-q4_k_m.gguf?download=true",
+            approxSizeBytes = 398_000_000L,
+            sizeLabel = "~398 MB",
+            description = "Excellent small model from Alibaba. Balanced and very fast on CPUs.",
+            gated = false
+        ),
+        CatalogModel(
+            id = "smollm2-360m-it-gguf",
+            name = "SmolLM2 360M · Instruct GGUF (q8_0)",
+            fileName = "smollm2-360m-instruct-q8_0.gguf",
+            url = "https://huggingface.co/HuggingFaceTB/SmolLM2-360M-Instruct-GGUF/resolve/main/smollm2-360m-instruct-q8_0.gguf?download=true",
+            approxSizeBytes = 380_000_000L,
+            sizeLabel = "~380 MB",
+            description = "Super lightweight and fast instruct model by HuggingFace.",
+            gated = false
+        ),
+        CatalogModel(
+            id = "deepseek-r1-distill-qwen-1.5b-gguf",
+            name = "DeepSeek-R1 Distill Qwen 1.5B · GGUF (q4_k_m)",
+            fileName = "DeepSeek-R1-Distill-Qwen-1.5B-Q4_K_M.gguf",
+            url = "https://huggingface.co/bartowski/DeepSeek-R1-Distill-Qwen-1.5B-GGUF/resolve/main/DeepSeek-R1-Distill-Qwen-1.5B-Q4_K_M.gguf?download=true",
+            approxSizeBytes = 1_110_000_000L,
+            sizeLabel = "~1.1 GB",
+            description = "Powerful distilled reasoning model from DeepSeek. Highly capable.",
+            gated = false
         )
     )
 

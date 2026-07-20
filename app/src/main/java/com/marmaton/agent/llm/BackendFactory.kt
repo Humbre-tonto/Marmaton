@@ -46,7 +46,12 @@ object BackendFactory {
     fun createBackend(context: Context, config: BackendConfig): LlmBackend {
         return when (config.selectedType) {
             BackendType.LOCAL_FILE -> {
-                LocalFileBackend(context, config.localModelFilePath)
+                val path = config.localModelFilePath
+                if (path.endsWith(".gguf", ignoreCase = true)) {
+                    GgufBackend(context, path)
+                } else {
+                    LocalFileBackend(context, path)
+                }
             }
             BackendType.OLLAMA -> {
                 OllamaBackend(
