@@ -56,6 +56,7 @@ class AgentForegroundService : Service() {
 
         fun log(message: String) {
             Log.d(TAG, message)
+            com.marmaton.agent.util.FileLogger.log("Agent", message)
             _runLog.update { current ->
                 val next = current.toMutableList()
                 next.add(message)
