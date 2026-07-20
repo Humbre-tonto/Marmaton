@@ -74,6 +74,27 @@ object ModelCatalog {
             description = "The lightest option from Hugging Face. Fine for a quick test on very limited devices; too small to drive the agent reliably.",
             gated = false
         ),
+        // ---- Coder GGUF models (ungated; tuned for writing and explaining code in Chat) ----
+        CatalogModel(
+            id = "qwen2.5-coder-1.5b-it-gguf",
+            name = "Qwen 2.5 Coder 1.5B · Instruct GGUF (q4_k_m) · Coding",
+            fileName = "qwen2.5-coder-1.5b-instruct-q4_k_m.gguf",
+            url = "https://huggingface.co/Qwen/Qwen2.5-Coder-1.5B-Instruct-GGUF/resolve/main/qwen2.5-coder-1.5b-instruct-q4_k_m.gguf?download=true",
+            approxSizeBytes = 1_120_000_000L,
+            sizeLabel = "~1.1 GB",
+            description = "Best small coding model for most phones (4 GB+ RAM). Great for writing and explaining short snippets in Chat. Not tuned for driving the on-screen agent — pick a Qwen Instruct model for that.",
+            gated = false
+        ),
+        CatalogModel(
+            id = "qwen2.5-coder-3b-it-gguf",
+            name = "Qwen 2.5 Coder 3B · Instruct GGUF (q4_k_m) · Best coding",
+            fileName = "qwen2.5-coder-3b-instruct-q4_k_m.gguf",
+            url = "https://huggingface.co/Qwen/Qwen2.5-Coder-3B-Instruct-GGUF/resolve/main/qwen2.5-coder-3b-instruct-q4_k_m.gguf?download=true",
+            approxSizeBytes = 1_930_000_000L,
+            sizeLabel = "~1.9 GB",
+            description = "Strongest on-device coding help, for higher-end phones (6 GB+ RAM). Handles longer snippets and multi-file reasoning better; slower and a larger download.",
+            gated = false
+        ),
         // ---- Gemma MediaPipe .task builds (gated; require a Hugging Face token) ----
         CatalogModel(
             id = "gemma3-1b-it-q4",
