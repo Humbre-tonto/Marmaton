@@ -29,37 +29,28 @@ object ModelCatalog {
     val models: List<CatalogModel> = listOf(
         CatalogModel(
             id = "gemma3-270m-it-q8",
-            name = "Gemma 3 270M · Instruct (q8)",
+            name = "Gemma 3 270M · Instruct (q8) · Test only",
             fileName = "gemma3-270m-it-q8.task",
             url = "https://huggingface.co/litert-community/gemma-3-270m-it/resolve/main/gemma3-270m-it-q8.task?download=true",
             approxSizeBytes = 300_000_000L,
             sizeLabel = "~300 MB",
-            description = "Tiny and fast — runs on almost any device. Best for trying the agent.",
+            description = "Loads on almost any device, but too small to reliably drive the agent — good only for a quick smoke test.",
             gated = true,
             licenseUrl = "https://huggingface.co/litert-community/gemma-3-270m-it"
         ),
         CatalogModel(
             id = "gemma3-1b-it-q4",
-            name = "Gemma 3 1B · Instruct (q4)",
+            name = "Gemma 3 1B · Instruct (q4) · Recommended",
             fileName = "Gemma3-1B-IT_multi-prefill-seq_q4_ekv4096.task",
             url = "https://huggingface.co/litert-community/Gemma3-1B-IT/resolve/main/Gemma3-1B-IT_multi-prefill-seq_q4_ekv4096.task?download=true",
             approxSizeBytes = 560_000_000L,
             sizeLabel = "~550 MB",
-            description = "Balanced quality and size for mid-range phones.",
+            description = "Recommended — loads and runs the agent on most modern phones. Best on-device option available today.",
             gated = true,
             licenseUrl = "https://huggingface.co/litert-community/Gemma3-1B-IT"
-        ),
-        CatalogModel(
-            id = "gemma3-4b-it-q4",
-            name = "Gemma 3 4B · Instruct (q4)",
-            fileName = "Gemma3-4B-IT_multi-prefill-seq_q4_ekv4096.task",
-            url = "https://huggingface.co/litert-community/Gemma3-4B-IT/resolve/main/Gemma3-4B-IT_multi-prefill-seq_q4_ekv4096.task?download=true",
-            approxSizeBytes = 3_100_000_000L,
-            sizeLabel = "~3.1 GB",
-            description = "Highest quality — needs a recent high-end device with plenty of RAM and storage.",
-            gated = true,
-            licenseUrl = "https://huggingface.co/litert-community/Gemma3-4B-IT"
         )
+        // Gemma 3 4B is intentionally not listed: the litert-community repo publishes it only as
+        // a web (.task) build, which the on-device MediaPipe engine can't open.
     )
 
     fun byId(id: String): CatalogModel? = models.firstOrNull { it.id == id }
