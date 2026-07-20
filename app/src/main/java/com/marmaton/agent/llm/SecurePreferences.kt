@@ -10,6 +10,7 @@ object SecurePreferences {
     private const val TAG = "SecurePreferences"
     private const val PREFS_NAME = "secure_prefs"
     private const val KEY_API_KEY = "cloud_api_key"
+    private const val KEY_HF_TOKEN = "huggingface_token"
 
     fun getApiKey(context: Context): String {
         return getPrefs(context).getString(KEY_API_KEY, "") ?: ""
@@ -17,6 +18,15 @@ object SecurePreferences {
 
     fun saveApiKey(context: Context, apiKey: String) {
         getPrefs(context).edit().putString(KEY_API_KEY, apiKey).apply()
+    }
+
+    /** Optional Hugging Face access token, used to download license-gated models. */
+    fun getHuggingFaceToken(context: Context): String {
+        return getPrefs(context).getString(KEY_HF_TOKEN, "") ?: ""
+    }
+
+    fun saveHuggingFaceToken(context: Context, token: String) {
+        getPrefs(context).edit().putString(KEY_HF_TOKEN, token).apply()
     }
 
     private fun getPrefs(context: Context): SharedPreferences {
