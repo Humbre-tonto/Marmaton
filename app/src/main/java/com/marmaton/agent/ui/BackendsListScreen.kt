@@ -178,6 +178,7 @@ fun BackendsListScreen(
                         Switch(
                             checked = config.analyticsConsent,
                             onCheckedChange = { consent ->
+                                com.marmaton.agent.analytics.Analytics.get().setEnabled(consent)
                                 coroutineScope.launch {
                                     persistence.updateAnalyticsConsent(consent)
                                 }
