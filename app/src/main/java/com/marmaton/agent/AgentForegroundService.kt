@@ -14,11 +14,11 @@ import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.marmaton.agent.analytics.Analytics
 import com.marmaton.agent.audio.AgentVoice
-import com.marmaton.agent.llm.AgentReasoner
 import com.marmaton.agent.llm.BackendConfig
 import com.marmaton.agent.llm.BackendFactory
 import com.marmaton.agent.llm.BackendStatus
 import com.marmaton.agent.llm.BackendType
+import com.marmaton.agent.llm.GemmaAgentEngine
 import com.marmaton.agent.llm.SettingsPersistence
 import com.marmaton.agent.parser.ScreenTreeParser
 import kotlinx.coroutines.CoroutineScope
@@ -187,8 +187,22 @@ class AgentForegroundService : Service() {
                             log("[Error] Active backend is not ready: $reason")
                             null
                         } else {
-                            val reasoner = AgentReasoner(backend)
-                            reasoner.reason(goal, serializedScreen)
+                            // Run reasoning inline so we can surface the model's raw output when
+                            // it can't be parsed into an action (e.g. a small model that doesn't
+                            // emit valid JSON).
+                            val prompt = GemmaAgentEngine.buildSystemPrompt(goal, serializedScreen)
+                            val raw = backend.generate(prompt)
+                            val parsed = GemmaAgentEngine.parseAction(raw)
+                            if (parsed == null) {
+                                val preview = raw.trim().replace("\n", " ").take(300)
+                                log(
+                                    if (preview.isBlank())
+                                        "[Error] Model returned an empty response. The model may have failed to load or run."
+                                    else
+                                        "[Error] Model output wasn't a valid JSON action. Raw output: $preview"
+                                )
+                            }
+                            parsed
                         }
                     } catch (e: Throwable) {
                         log("[Error] Backend error: ${e.message ?: e.toString()}")
