@@ -12,6 +12,10 @@ class GgufBackend(
 ) : LlmBackend {
     override val displayName: String = "Local GGUF Model File"
 
+    // Guards modelHandle: status() (polled from the UI) and generate() (from the agent/chat loop)
+    // run on the same cached instance from different threads. Without this, two threads can both
+    // native-load(), or close() can free() the handle mid-load (use-after-free → native crash).
+    private val lock = Any()
     private var modelHandle: Long = 0L
 
     companion object {
@@ -44,18 +48,20 @@ class GgufBackend(
             throw IllegalStateException("Imported GGUF model file does not exist at $modelPath")
         }
 
-        if (modelHandle != 0L) {
-            return@withContext
-        }
-
-        try {
-            modelHandle = load(modelPath, 4096, 4)
-            if (modelHandle == 0L) {
-                throw IllegalStateException("Failed to load native GGUF model.")
+        synchronized(lock) {
+            if (modelHandle != 0L) {
+                return@withContext
             }
-        } catch (e: Exception) {
-            Log.e("GgufBackend", "Error initialising GGUF native engine", e)
-            throw e
+            try {
+                val handle = load(modelPath, 4096, 4)
+                if (handle == 0L) {
+                    throw IllegalStateException("Failed to load native GGUF model.")
+                }
+                modelHandle = handle
+            } catch (e: Exception) {
+                Log.e("GgufBackend", "Error initialising GGUF native engine", e)
+                throw e
+            }
         }
     }
 
@@ -77,11 +83,12 @@ class GgufBackend(
 
     override suspend fun generate(prompt: String): String = withContext(Dispatchers.Default) {
         initEngine()
-        if (modelHandle == 0L) {
+        val handle = synchronized(lock) { modelHandle }
+        if (handle == 0L) {
             throw IllegalStateException("GGUF native model handle is invalid.")
         }
         try {
-            generate(modelHandle, prompt, 256)
+            generate(handle, prompt, 256)
         } catch (e: Exception) {
             Log.e("GgufBackend", "Error during JNI text generation", e)
             throw e
@@ -89,13 +96,15 @@ class GgufBackend(
     }
 
     override fun close() {
-        if (modelHandle != 0L) {
-            try {
-                free(modelHandle)
-            } catch (e: Exception) {
-                Log.e("GgufBackend", "Error freeing GGUF native engine handle", e)
-            } finally {
-                modelHandle = 0L
+        synchronized(lock) {
+            if (modelHandle != 0L) {
+                try {
+                    free(modelHandle)
+                } catch (e: Exception) {
+                    Log.e("GgufBackend", "Error freeing GGUF native engine handle", e)
+                } finally {
+                    modelHandle = 0L
+                }
             }
         }
     }

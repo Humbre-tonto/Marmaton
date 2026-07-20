@@ -83,7 +83,7 @@ object ChatSession {
         _messages.value = emptyList()
     }
 
-    private fun buildPrompt(history: List<ChatMessage>): String {
+    internal fun buildPrompt(history: List<ChatMessage>): String {
         val recent = history.takeLast(MAX_HISTORY_MESSAGES)
         val sb = StringBuilder()
         sb.append(SYSTEM_PROMPT).append("\n\n")
