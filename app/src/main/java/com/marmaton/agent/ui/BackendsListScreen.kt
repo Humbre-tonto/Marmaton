@@ -320,16 +320,12 @@ fun LocalBackendDetailScreen(onBack: () -> Unit) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
     val persistence = remember { SettingsPersistence(context) }
-    var config by remember { mutableStateOf(BackendConfig()) }
+    val config by persistence.configFlow.collectAsState(initial = BackendConfig())
 
     var isImporting by remember { mutableStateOf(false) }
     var importProgress by remember { mutableStateOf(0f) }
     var importError by remember { mutableStateOf<String?>(null) }
     var importSuccess by remember { mutableStateOf(false) }
-
-    LaunchedEffect(Unit) {
-        config = persistence.configFlow.first()
-    }
 
     fun getFileSize(uri: Uri): Long {
         return try {
@@ -383,7 +379,6 @@ fun LocalBackendDetailScreen(onBack: () -> Unit) {
                     }
                 }
                 persistence.updateLocalModel(destFile.absolutePath, uri.toString(), fileName)
-                config = persistence.configFlow.first()
                 importSuccess = true
             } catch (e: Exception) {
                 importError = "Import failed: ${e.message}"
@@ -521,6 +516,8 @@ fun LocalBackendDetailScreen(onBack: () -> Unit) {
                     }
                 }
             }
+
+            ModelCatalogSection()
         }
     }
 }
