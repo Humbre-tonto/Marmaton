@@ -37,6 +37,8 @@
 
     <!-- Common Navigation -->
     <string name="nav_home">Home</string>
+    <string name="nav_chat">Chat</string>
+    <string name="nav_workflows">Workflows</string>
     <string name="nav_activity">Activity</string>
     <string name="nav_backends">Backends</string>
     <string name="btn_continue">Continue</string>

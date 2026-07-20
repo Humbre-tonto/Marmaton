@@ -54,6 +54,14 @@ class AgentForegroundService : Service() {
         private val _runLog = MutableStateFlow<List<String>>(emptyList())
         val runLog: StateFlow<List<String>> = _runLog.asStateFlow()
 
+        // When non-empty, the agent runs these goals in order (a workflow); each is treated as a
+        // goal and, once FINISHED, the next begins. Empty for a plain single-goal run.
+        private val _workflowSteps = MutableStateFlow<List<String>>(emptyList())
+        val workflowSteps: StateFlow<List<String>> = _workflowSteps.asStateFlow()
+
+        private val _workflowName = MutableStateFlow("")
+        val workflowName: StateFlow<String> = _workflowName.asStateFlow()
+
         fun log(message: String) {
             Log.d(TAG, message)
             com.marmaton.agent.util.FileLogger.log("Agent", message)
@@ -68,7 +76,28 @@ class AgentForegroundService : Service() {
         }
 
         fun startAgent(context: Context, goal: String) {
+            _workflowSteps.value = emptyList()
+            _workflowName.value = ""
             _userGoal.value = goal
+            _runLog.value = emptyList()
+            val intent = Intent(context, AgentForegroundService::class.java)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                context.startForegroundService(intent)
+            } else {
+                context.startService(intent)
+            }
+        }
+
+        /**
+         * Run an ordered list of natural-language steps as a workflow. Each step is executed as a
+         * goal; when the agent reports FINISHED the next step begins, until all steps are done.
+         */
+        fun startWorkflow(context: Context, name: String, steps: List<String>) {
+            val cleaned = steps.map { it.trim() }.filter { it.isNotEmpty() }
+            if (cleaned.isEmpty()) return
+            _workflowName.value = name
+            _workflowSteps.value = cleaned
+            _userGoal.value = cleaned.first()
             _runLog.value = emptyList()
             val intent = Intent(context, AgentForegroundService::class.java)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -133,6 +162,7 @@ class AgentForegroundService : Service() {
 
         loopJob = serviceScope.launch {
             var stepCount = 0
+            var currentStepIndex = 0
             val startTime = System.currentTimeMillis()
             var isSuccess = false
             var wasExceptionThrown = false
@@ -223,12 +253,25 @@ class AgentForegroundService : Service() {
 
                     when (action.actionType) {
                         "FINISHED" -> {
-                            log("[Agent] Goal Successfully Achieved! Stopping loop.")
-                            AgentVoice.speak("Goal achieved.")
-                            isSuccess = true
-                            _isRunning.value = false
-                            stopSelf()
-                            break
+                            val steps = _workflowSteps.value
+                            if (steps.isNotEmpty() && currentStepIndex < steps.lastIndex) {
+                                // Workflow: this step is done — advance to the next one.
+                                val completed = currentStepIndex + 1
+                                log("[Agent] Workflow step $completed of ${steps.size} done.")
+                                currentStepIndex++
+                                val nextGoal = steps[currentStepIndex]
+                                _userGoal.value = nextGoal
+                                log("[Agent] Next step: $nextGoal")
+                                AgentVoice.speak("Step complete. Next: $nextGoal")
+                                delay(1500)
+                            } else {
+                                log("[Agent] Goal Successfully Achieved! Stopping loop.")
+                                AgentVoice.speak("Goal achieved.")
+                                isSuccess = true
+                                _isRunning.value = false
+                                stopSelf()
+                                break
+                            }
                         }
                         "WAIT" -> {
                             log("[Action] Waiting for 3 seconds...")
