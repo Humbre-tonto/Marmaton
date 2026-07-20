@@ -185,6 +185,34 @@ fun BackendsListScreen(
                         )
                     }
 
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Speak actions aloud",
+                                style = IonVioletTypography.body,
+                                color = MaterialTheme.colorScheme.onBackground
+                            )
+                            Text(
+                                text = "The agent narrates its goal and each action using your device's voice.",
+                                style = IonVioletTypography.bodySm,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+
+                        Switch(
+                            checked = config.voiceEnabled,
+                            onCheckedChange = { enabled ->
+                                coroutineScope.launch {
+                                    persistence.updateVoiceEnabled(enabled)
+                                }
+                            }
+                        )
+                    }
+
                     Text(
                         text = "Privacy Policy",
                         style = IonVioletTypography.label.copy(
