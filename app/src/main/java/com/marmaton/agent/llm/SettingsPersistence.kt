@@ -26,7 +26,8 @@ data class BackendConfig(
     val cloudModel: String = "gpt-4o-mini",
     val isOnboardingCompleted: Boolean = false,
     val analyticsConsent: Boolean = false,
-    val firstRunTracked: Boolean = false
+    val firstRunTracked: Boolean = false,
+    val voiceEnabled: Boolean = false
 )
 
 class SettingsPersistence(
@@ -49,6 +50,7 @@ class SettingsPersistence(
         private val KEY_ONBOARDING_COMPLETED = booleanPreferencesKey("onboarding_completed")
         private val KEY_ANALYTICS_CONSENT = booleanPreferencesKey("analytics_consent")
         private val KEY_FIRST_RUN_TRACKED = booleanPreferencesKey("first_run_tracked")
+        private val KEY_VOICE_ENABLED = booleanPreferencesKey("voice_enabled")
     }
 
     val configFlow: Flow<BackendConfig> = dataStore.data.map { preferences ->
@@ -72,7 +74,8 @@ class SettingsPersistence(
             cloudModel = preferences[KEY_CLOUD_MODEL] ?: "gpt-4o-mini",
             isOnboardingCompleted = preferences[KEY_ONBOARDING_COMPLETED] ?: false,
             analyticsConsent = preferences[KEY_ANALYTICS_CONSENT] ?: false,
-            firstRunTracked = preferences[KEY_FIRST_RUN_TRACKED] ?: false
+            firstRunTracked = preferences[KEY_FIRST_RUN_TRACKED] ?: false,
+            voiceEnabled = preferences[KEY_VOICE_ENABLED] ?: false
         )
     }
 
@@ -115,6 +118,12 @@ class SettingsPersistence(
     suspend fun updateAnalyticsConsent(consent: Boolean) {
         dataStore.edit { preferences ->
             preferences[KEY_ANALYTICS_CONSENT] = consent
+        }
+    }
+
+    suspend fun updateVoiceEnabled(enabled: Boolean) {
+        dataStore.edit { preferences ->
+            preferences[KEY_VOICE_ENABLED] = enabled
         }
     }
 

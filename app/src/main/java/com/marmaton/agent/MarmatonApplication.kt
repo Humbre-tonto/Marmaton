@@ -2,6 +2,7 @@ package com.marmaton.agent
 
 import android.app.Application
 import com.marmaton.agent.analytics.Analytics
+import com.marmaton.agent.audio.AgentVoice
 import com.marmaton.agent.llm.BackendConfig
 import com.marmaton.agent.llm.BackendType
 import com.marmaton.agent.llm.SettingsPersistence
@@ -23,6 +24,7 @@ class MarmatonApplication : Application() {
         scope.launch {
             val persistence = SettingsPersistence(this@MarmatonApplication)
             var lastConsent: Boolean? = null
+            var lastVoice: Boolean? = null
 
             persistence.configFlow.collect { config ->
                 val currentConsent = config.analyticsConsent
@@ -34,6 +36,11 @@ class MarmatonApplication : Application() {
                 if (currentConsent && !config.firstRunTracked) {
                     Analytics.get().trackFirstRun()
                     persistence.updateFirstRunTracked(true)
+                }
+
+                if (config.voiceEnabled != lastVoice) {
+                    lastVoice = config.voiceEnabled
+                    AgentVoice.setEnabled(this@MarmatonApplication, config.voiceEnabled)
                 }
             }
         }

@@ -13,6 +13,7 @@ import android.os.IBinder
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.marmaton.agent.analytics.Analytics
+import com.marmaton.agent.audio.AgentVoice
 import com.marmaton.agent.llm.AgentReasoner
 import com.marmaton.agent.llm.BackendConfig
 import com.marmaton.agent.llm.BackendFactory
@@ -145,6 +146,8 @@ class AgentForegroundService : Service() {
                 Analytics.get().trackBackendSelected(type, modelName, providerHost)
             }
 
+            AgentVoice.speak("Starting. Goal: ${_userGoal.value}")
+
             try {
                 while (_isRunning.value) {
                     val service = MarmatonAccessibilityService.instance
@@ -206,6 +209,7 @@ class AgentForegroundService : Service() {
                     when (action.actionType) {
                         "FINISHED" -> {
                             log("[Agent] Goal Successfully Achieved! Stopping loop.")
+                            AgentVoice.speak("Goal achieved.")
                             isSuccess = true
                             _isRunning.value = false
                             stopSelf()
@@ -216,6 +220,7 @@ class AgentForegroundService : Service() {
                             delay(3000)
                         }
                         else -> {
+                            AgentVoice.speak(action.reasoning.ifBlank { action.actionType })
                             val dispatched = service.executeAction(action)
                             if (dispatched) {
                                 log("[Action] Action executed successfully.")
@@ -229,6 +234,7 @@ class AgentForegroundService : Service() {
             } catch (e: Exception) {
                 Log.e(TAG, "Exception during autonomous loop", e)
                 wasExceptionThrown = true
+                AgentVoice.speak("I ran into an error.")
             } finally {
                 val durationMs = System.currentTimeMillis() - startTime
                 val type = when (backendConfig?.selectedType) {

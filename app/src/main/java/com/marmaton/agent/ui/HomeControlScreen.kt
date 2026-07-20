@@ -1,9 +1,13 @@
 package com.marmaton.agent.ui
 
 import android.accessibilityservice.AccessibilityService
+import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.provider.Settings
+import android.speech.RecognizerIntent
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
@@ -305,6 +309,17 @@ fun IdleStateCard(
     activeBackendStatus: BackendStatus,
     isAccessibilityEnabled: Boolean
 ) {
+    val speechLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == Activity.RESULT_OK) {
+            val spoken = result.data
+                ?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)
+                ?.firstOrNull()
+            if (!spoken.isNullOrBlank()) onGoalChange(spoken)
+        }
+    }
+
     Column(
         modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(Spacing.space16)
@@ -348,6 +363,24 @@ fun IdleStateCard(
                     value = userGoalInput,
                     onValueChange = onGoalChange,
                     placeholder = { Text(stringResource(R.string.home_goal_label)) },
+                    trailingIcon = {
+                        IconButton(onClick = {
+                            try {
+                                val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+                                    putExtra(
+                                        RecognizerIntent.EXTRA_LANGUAGE_MODEL,
+                                        RecognizerIntent.LANGUAGE_MODEL_FREE_FORM
+                                    )
+                                    putExtra(RecognizerIntent.EXTRA_PROMPT, "Say the goal")
+                                }
+                                speechLauncher.launch(intent)
+                            } catch (e: Exception) {
+                                // No speech recognizer available on this device.
+                            }
+                        }) {
+                            Text("🎤")
+                        }
+                    },
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(76.dp),
