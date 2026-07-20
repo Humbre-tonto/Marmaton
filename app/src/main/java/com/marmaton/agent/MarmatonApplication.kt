@@ -2,6 +2,7 @@ package com.marmaton.agent
 
 import android.app.Application
 import com.marmaton.agent.analytics.Analytics
+import com.marmaton.agent.util.FileLogger
 import com.marmaton.agent.audio.AgentVoice
 import com.marmaton.agent.llm.BackendConfig
 import com.marmaton.agent.llm.BackendType
@@ -17,6 +18,7 @@ class MarmatonApplication : Application() {
     @OptIn(FlowPreview::class)
     override fun onCreate() {
         super.onCreate()
+        FileLogger.init(this)
         Analytics.init(this, false)
 
         // Run background configuration collection to sync consent, track first-run and track changes

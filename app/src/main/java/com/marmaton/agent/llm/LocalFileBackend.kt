@@ -3,6 +3,7 @@ package com.marmaton.agent.llm
 import android.content.Context
 import android.util.Log
 import com.google.mediapipe.tasks.genai.llminference.LlmInference
+import com.marmaton.agent.util.FileLogger
 import java.io.File
 
 class LocalFileBackend(
@@ -31,6 +32,7 @@ class LocalFileBackend(
         // Close old instance if any
         close()
 
+        FileLogger.log("LocalBackend", "Loading MediaPipe model: $modelPath (${file.length()} bytes)")
         try {
             val options = LlmInference.LlmInferenceOptions.builder()
                 .setModelPath(modelPath)
@@ -38,12 +40,15 @@ class LocalFileBackend(
                 .build()
             llmInference = LlmInference.createFromOptions(context, options)
             lastLoadedPath = modelPath
+            FileLogger.log("LocalBackend", "MediaPipe model loaded OK")
             return llmInference!!
         } catch (e: Exception) {
             Log.e("LocalFileBackend", "Failed to initialize MediaPipe LlmInference", e)
+            FileLogger.log("LocalBackend", "Model load FAILED: ${e.javaClass.simpleName}: ${e.message}")
             throw e
         } catch (e: UnsatisfiedLinkError) {
             Log.e("LocalFileBackend", "UnsatisfiedLinkError (likely JVM test environment)", e)
+            FileLogger.log("LocalBackend", "Native MediaPipe library not available: ${e.message}")
             throw IllegalStateException("Native MediaPipe library not available", e)
         }
     }
@@ -67,9 +72,19 @@ class LocalFileBackend(
     override suspend fun generate(prompt: String): String {
         val engine = initEngine()
         return try {
-            engine.generateResponse(prompt)
+            val start = System.currentTimeMillis()
+            FileLogger.log("LocalBackend", "generate() start, prompt chars=${prompt.length}")
+            val response = engine.generateResponse(prompt)
+            val ms = System.currentTimeMillis() - start
+            FileLogger.log(
+                "LocalBackend",
+                "generate() done in ${ms}ms, response chars=${response.length}: " +
+                    response.take(400).replace("\n", " ")
+            )
+            response
         } catch (e: Exception) {
             Log.e("LocalFileBackend", "Error during generation", e)
+            FileLogger.log("LocalBackend", "generate() FAILED: ${e.javaClass.simpleName}: ${e.message}")
             throw e
         }
     }
