@@ -126,8 +126,6 @@ class ModelDownloadService : Service() {
 
     private suspend fun runDownload(model: CatalogModel) {
         val dir = (getExternalFilesDir("models") ?: File(filesDir, "models")).apply { mkdirs() }
-        val finalFile = File(dir, model.fileName)
-        val partFile = File(dir, model.fileName + ".part")
 
         val client = OkHttpClient.Builder()
             .callTimeout(0, TimeUnit.MILLISECONDS)
@@ -135,11 +133,33 @@ class ModelDownloadService : Service() {
             .readTimeout(60, TimeUnit.SECONDS)
             .build()
 
+        val token = SecurePreferences.getHuggingFaceToken(applicationContext)
+
+        // The catalog's exact filename can drift and 404. If it does, look up a real .task file
+        // in the model's Hugging Face repo and download that instead.
+        var effectiveUrl = model.url
+        var effectiveFileName = model.fileName
+        val headCode = try {
+            val hb = Request.Builder().url(model.url).head()
+            if (token.isNotBlank()) hb.header("Authorization", "Bearer $token")
+            client.newCall(hb.build()).execute().use { it.code }
+        } catch (e: Exception) {
+            null
+        }
+        if (headCode == 404) {
+            resolveRealTaskFile(client, model.url, token)?.let {
+                effectiveUrl = it.first
+                effectiveFileName = it.second
+            }
+        }
+
+        val finalFile = File(dir, effectiveFileName)
+        val partFile = File(dir, effectiveFileName + ".part")
+
         try {
             var existing = if (partFile.exists()) partFile.length() else 0L
 
-            val token = SecurePreferences.getHuggingFaceToken(applicationContext)
-            val requestBuilder = Request.Builder().url(model.url)
+            val requestBuilder = Request.Builder().url(effectiveUrl)
             if (existing > 0L) {
                 requestBuilder.header("Range", "bytes=$existing-")
             }
@@ -234,7 +254,7 @@ class ModelDownloadService : Service() {
             }
 
             val persistence = SettingsPersistence(applicationContext)
-            persistence.updateLocalModel(finalFile.absolutePath, model.url, model.fileName)
+            persistence.updateLocalModel(finalFile.absolutePath, effectiveUrl, effectiveFileName)
             persistence.updateSelectedType(com.marmaton.agent.llm.BackendType.LOCAL_FILE)
 
             _state.value = _state.value.copy(
@@ -251,6 +271,44 @@ class ModelDownloadService : Service() {
 
     private fun fail(message: String) {
         _state.value = _state.value.copy(phase = Phase.FAILED, message = message)
+    }
+
+    /**
+     * When the catalog URL 404s, query the Hugging Face API for the repo's real `.task` files and
+     * pick a suitable one (preferring non-web q8 → q4 → first). Returns (downloadUrl, fileName).
+     */
+    private fun resolveRealTaskFile(
+        client: OkHttpClient,
+        originalUrl: String,
+        token: String
+    ): Pair<String, String>? {
+        val repoId = Regex("huggingface\\.co/(.+?)/resolve/")
+            .find(originalUrl)?.groupValues?.getOrNull(1) ?: return null
+        val apiBuilder = Request.Builder().url("https://huggingface.co/api/models/$repoId")
+        if (token.isNotBlank()) apiBuilder.header("Authorization", "Bearer $token")
+        return try {
+            client.newCall(apiBuilder.build()).execute().use { resp ->
+                if (!resp.isSuccessful) return null
+                val bodyStr = resp.body?.string() ?: return null
+                val siblings = org.json.JSONObject(bodyStr).optJSONArray("siblings") ?: return null
+                val tasks = ArrayList<String>()
+                for (i in 0 until siblings.length()) {
+                    val f = siblings.optJSONObject(i)?.optString("rfilename") ?: continue
+                    if (f.endsWith(".task")) tasks.add(f)
+                }
+                if (tasks.isEmpty()) return null
+                // Web variants don't load on Android; prefer a mobile q8, then q4, else the first.
+                val candidates = tasks.filterNot { it.contains("web", ignoreCase = true) }
+                    .ifEmpty { tasks }
+                val chosen = candidates.firstOrNull { it.contains("q8", ignoreCase = true) }
+                    ?: candidates.firstOrNull { it.contains("q4", ignoreCase = true) }
+                    ?: candidates.first()
+                Pair("https://huggingface.co/$repoId/resolve/main/$chosen?download=true", chosen)
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to resolve real .task file from HF API", e)
+            null
+        }
     }
 
     override fun onDestroy() {

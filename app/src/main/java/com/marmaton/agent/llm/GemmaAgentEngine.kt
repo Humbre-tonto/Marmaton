@@ -192,12 +192,41 @@ object GemmaAgentEngine {
         if (clean.endsWith("```")) {
             clean = clean.removeSuffix("```").trim()
         }
-        // Extract first '{' to last '}' to strip any external conversational text from Gemma
-        val firstBrace = clean.indexOf('{')
-        val lastBrace = clean.lastIndexOf('}')
-        if (firstBrace != -1 && lastBrace != -1 && lastBrace > firstBrace) {
-            clean = clean.substring(firstBrace, lastBrace + 1)
+        // Extract the first balanced { ... } object, ignoring braces that appear inside strings.
+        // This is more robust than first-'{'-to-last-'}' when a small model appends extra prose
+        // (which may itself contain stray braces) after the JSON.
+        val start = clean.indexOf('{')
+        if (start != -1) {
+            var depth = 0
+            var inString = false
+            var escaped = false
+            var end = -1
+            for (i in start until clean.length) {
+                val c = clean[i]
+                if (inString) {
+                    when {
+                        escaped -> escaped = false
+                        c == '\\' -> escaped = true
+                        c == '"' -> inString = false
+                    }
+                } else {
+                    when (c) {
+                        '"' -> inString = true
+                        '{' -> depth++
+                        '}' -> {
+                            depth--
+                            if (depth == 0) {
+                                end = i
+                                break
+                            }
+                        }
+                    }
+                }
+            }
+            clean = if (end != -1) clean.substring(start, end + 1) else clean.substring(start)
         }
+        // Drop trailing commas before a closing brace/bracket, which small models often emit.
+        clean = clean.replace(Regex(",\\s*([}\\]])"), "$1")
         return clean
     }
 }
