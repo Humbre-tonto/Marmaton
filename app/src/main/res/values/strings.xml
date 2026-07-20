@@ -2,4 +2,117 @@
     <string name="app_name">Marmaton Agent</string>
     <string name="accessibility_service_label">Marmaton Autonomous AI Agent</string>
     <string name="accessibility_service_description">Marmaton local AI agent accessibility service for autonomous work.</string>
+
+    <!-- Onboarding Strings -->
+    <string name="onboarding_welcome_title">Welcome to Marmaton</string>
+    <string name="onboarding_welcome_desc">Your autonomous mobile AI agent. Before we begin, please review these key features:</string>
+    <string name="onboarding_safety_1_title">Always Visible</string>
+    <string name="onboarding_safety_1_desc">Marmaton operations are completely visible on your screen.</string>
+    <string name="onboarding_safety_2_title">One Tap to Stop</string>
+    <string name="onboarding_safety_2_desc">The red stop button is always visible to halt the agent immediately.</string>
+    <string name="onboarding_safety_3_title">Local-first Privacy</string>
+    <string name="onboarding_safety_3_desc">Your screen data stays completely secure. Local inference is fully offline.</string>
+    <string name="onboarding_get_started">Get started</string>
+
+    <string name="onboarding_accessibility_title">Enable Accessibility</string>
+    <string name="onboarding_accessibility_desc">Marmaton needs Accessibility permissions to analyze your screen, click elements, and type text autonomously.</string>
+    <string name="onboarding_accessibility_status_disabled">Status: Not enabled</string>
+    <string name="onboarding_accessibility_status_enabled">Status: Enabled</string>
+    <string name="onboarding_accessibility_button">Open Accessibility Settings</string>
+
+    <string name="onboarding_backend_title">Choose a Backend</string>
+    <string name="onboarding_backend_desc">Select how Marmaton should think. You can run offline models or connect to a server.</string>
+    <string name="onboarding_backend_local">On-device local model</string>
+    <string name="onboarding_backend_local_desc">Run fully offline using a model file stored on your phone (Qwen/DeepSeek/Gemma).</string>
+    <string name="onboarding_backend_ollama">Ollama on your network</string>
+    <string name="onboarding_backend_ollama_desc">Connect to an Ollama server running on your local network.</string>
+    <string name="onboarding_backend_cloud">Cloud API</string>
+    <string name="onboarding_backend_cloud_desc">Connect to an OpenAI-compatible cloud API endpoint.</string>
+
+    <string name="onboarding_ready_title">You\'re all set!</string>
+    <string name="onboarding_ready_desc">Marmaton is ready to execute actions. Here\'s your checklist:</string>
+    <string name="onboarding_check_accessibility">Accessibility permission enabled</string>
+    <string name="onboarding_check_backend">LLM Backend is ready</string>
+    <string name="onboarding_start_marmaton">Start using Marmaton</string>
+
+    <!-- Common Navigation -->
+    <string name="nav_home">Home</string>
+    <string name="nav_activity">Activity</string>
+    <string name="nav_backends">Backends</string>
+    <string name="btn_continue">Continue</string>
+    <string name="btn_back">Back</string>
+
+    <!-- Home Control Screen Strings -->
+    <string name="home_title">Marmaton Control</string>
+    <string name="home_agent_idle_title">Give me a goal.</string>
+    <string name="home_agent_running">Running</string>
+    <string name="home_goal_label">e.g. Turn on Battery Saver</string>
+    <string name="home_start_btn">Start</string>
+    <string name="home_stop_btn">STOP</string>
+    <string name="home_emergency_stop">EMERGENCY STOP</string>
+    <string name="home_backend_title">Backend</string>
+    <string name="home_accessibility_title">Accessibility</string>
+    <string name="home_accessibility_connected">Connected</string>
+    <string name="home_accessibility_disconnected">Disconnected</string>
+    <string name="home_accessibility_service_on">● service on</string>
+    <string name="home_accessibility_service_off">● service off</string>
+    <string name="home_backend_ready">● ready</string>
+    <string name="home_backend_not_ready">● not ready</string>
+    <string name="home_recent_runs_title">Recent Runs</string>
+    <string name="home_finished_success">Done</string>
+    <string name="home_finished_desc">Completed in %1$s · %2$d steps</string>
+    <string name="home_verification_line">Goal verification successful.</string>
+    <string name="home_run_again">Run again</string>
+    <string name="home_new_objective">New objective</string>
+    <string name="home_error_title">Couldn\'t find toggle</string>
+    <string name="home_error_expected">Expected: %1$s</string>
+    <string name="home_error_found">Found: %1$s</string>
+    <string name="home_error_attempts">Attempts: %1$d</string>
+    <string name="home_view_details">View details</string>
+    <string name="home_retry">Retry</string>
+    <string name="home_blocking_title">Blocked</string>
+    <string name="home_blocking_desc">Marmaton is paused because the Accessibility Service was disabled.</string>
+
+    <!-- Activity Log / Timeline Strings -->
+    <string name="activity_title">Activity Logs</string>
+    <string name="activity_timeline">Timeline</string>
+    <string name="activity_raw">Raw</string>
+    <string name="activity_reasoning">Reasoning: %1$s</string>
+    <string name="activity_sees">Sees: %1$s</string>
+
+    <!-- Backends Screen Strings -->
+    <string name="backends_title">Inference Backends</string>
+    <string name="backends_on_device_title">On-device local model</string>
+    <string name="backends_on_device_subtitle">gemma-3n-e4b · 2.1 GB</string>
+    <string name="backends_ollama_title">Ollama (LAN)</string>
+    <string name="backends_ollama_subtitle">192.168.1.42:11434 · llama3.1</string>
+    <string name="backends_cloud_title">Cloud API</string>
+    <string name="backends_cloud_not_configured">Not configured</string>
+    <string name="backends_cloud_configured">Configured</string>
+
+    <string name="backend_status_active">ACTIVE</string>
+    <string name="backend_status_ready">ready</string>
+    <string name="backend_status_unreachable">unreachable</string>
+    <string name="backend_status_not_configured">not configured</string>
+
+    <string name="backends_local_detail_title">Local Model Configuration</string>
+    <string name="backends_local_downloading">downloading</string>
+    <string name="backends_local_progress">%1$s / %2$s · %3$d%%</string>
+    <string name="backends_local_model_file">Model file</string>
+    <string name="backends_local_choose_different">Choose a different file…</string>
+    <string name="backends_cancel">Cancel</string>
+
+    <string name="backends_ollama_detail_title">Ollama Configuration</string>
+    <string name="backends_ollama_host">Host/IP</string>
+    <string name="backends_ollama_port">Port</string>
+    <string name="backends_ollama_model">Model name</string>
+    <string name="backends_ollama_error_banner">Unable to connect to Ollama server. Check host and port.</string>
+    <string name="backends_ollama_test_connection">Test connection</string>
+    <string name="backends_ollama_success">Connected successfully!</string>
+
+    <string name="backends_cloud_detail_title">Cloud API Configuration</string>
+    <string name="backends_cloud_endpoint">Endpoint</string>
+    <string name="backends_cloud_api_key">API Key</string>
+    <string name="backends_cloud_model">Model</string>
+    <string name="backends_cloud_privacy_note">Goals and screen text are sent to this endpoint. Screenshots stay on-device.</string>
 </resources>

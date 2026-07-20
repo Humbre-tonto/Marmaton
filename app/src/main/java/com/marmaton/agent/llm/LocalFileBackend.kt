@@ -74,7 +74,7 @@ class LocalFileBackend(
         }
     }
 
-    fun close() {
+    override fun close() {
         try {
             llmInference?.close()
         } catch (e: Exception) {

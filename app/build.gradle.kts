@@ -20,6 +20,12 @@ android {
         vectorDrawables {
             useSupportLibrary = true
         }
+
+        val postHogApiKey = (project.findProperty("POSTHOG_API_KEY") as? String) ?: System.getenv("POSTHOG_API_KEY") ?: ""
+        val postHogHost = (project.findProperty("POSTHOG_HOST") as? String) ?: System.getenv("POSTHOG_HOST") ?: "https://eu.i.posthog.com"
+
+        buildConfigField("String", "POSTHOG_API_KEY", "\"$postHogApiKey\"")
+        buildConfigField("String", "POSTHOG_HOST", "\"$postHogHost\"")
     }
 
     buildTypes {
@@ -41,6 +47,7 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
     packaging {
         resources {
@@ -50,6 +57,7 @@ android {
 }
 
 dependencies {
+    implementation(libs.posthog.android)
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.activity.compose)
@@ -58,6 +66,7 @@ dependencies {
     implementation(libs.androidx.compose.ui.graphics)
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.compose.material3)
+    implementation("androidx.navigation:navigation-compose:2.7.7")
 
     // ML Kit GenAI Prompt API
     implementation(libs.google.mlkit.genai.prompt)
