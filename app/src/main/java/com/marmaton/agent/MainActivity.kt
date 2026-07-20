@@ -88,6 +88,40 @@ class MainActivity : ComponentActivity() {
                                 }
                             }
 
+                            composable("chat") {
+                                MainBottomNavigationWrapper(
+                                    currentTab = "chat",
+                                    onTabSelected = { tab ->
+                                        if (tab != "chat") {
+                                            navController.navigate(tab) {
+                                                popUpTo("home") { saveState = true }
+                                                launchSingleTop = true
+                                                restoreState = true
+                                            }
+                                        }
+                                    }
+                                ) {
+                                    ChatScreen()
+                                }
+                            }
+
+                            composable("workflows") {
+                                MainBottomNavigationWrapper(
+                                    currentTab = "workflows",
+                                    onTabSelected = { tab ->
+                                        if (tab != "workflows") {
+                                            navController.navigate(tab) {
+                                                popUpTo("home") { saveState = true }
+                                                launchSingleTop = true
+                                                restoreState = true
+                                            }
+                                        }
+                                    }
+                                ) {
+                                    WorkflowsScreen()
+                                }
+                            }
+
                             composable("activity") {
                                 MainBottomNavigationWrapper(
                                     currentTab = "activity",
@@ -164,6 +198,26 @@ fun MainBottomNavigationWrapper(
                         }
                     },
                     label = { Text(stringResource(R.string.nav_home)) }
+                )
+                NavigationBarItem(
+                    selected = currentTab == "chat",
+                    onClick = { onTabSelected("chat") },
+                    icon = {
+                        BadgedBox(badge = {}) {
+                            Text("💬")
+                        }
+                    },
+                    label = { Text(stringResource(R.string.nav_chat)) }
+                )
+                NavigationBarItem(
+                    selected = currentTab == "workflows",
+                    onClick = { onTabSelected("workflows") },
+                    icon = {
+                        BadgedBox(badge = {}) {
+                            Text("🔀")
+                        }
+                    },
+                    label = { Text(stringResource(R.string.nav_workflows)) }
                 )
                 NavigationBarItem(
                     selected = currentTab == "activity",
