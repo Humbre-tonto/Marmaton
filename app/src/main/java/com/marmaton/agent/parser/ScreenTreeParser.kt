@@ -12,6 +12,12 @@ object ScreenTreeParser {
         explicitNulls = false
     }
 
+    // On-device models have small context windows (e.g. Gemma 3 1B ekv1280). If the serialized
+    // screen fills the window, the model's answer gets truncated mid-JSON. Keep the prompt bounded
+    // and prioritize interactive elements so the actionable controls always survive the trim.
+    private const val MAX_NODES = 45
+    private const val MAX_CHARS = 1400
+
     /**
      * Traverses the AccessibilityNodeInfo tree and serializes it to a compact, minimal JSON array string.
      * It aggressively filters out invisible nodes, scrollbars, and decorative layouts with no content/interactions.
@@ -20,8 +26,17 @@ object ScreenTreeParser {
         if (root == null) return "[]"
         val nodes = mutableListOf<ScreenNode>()
         traverseAndCollect(root, nodes)
+
+        // Interactive (clickable/scrollable) nodes first, so they survive if we trim.
+        val ordered = nodes.sortedByDescending { it.clk || it.scrl }.take(MAX_NODES)
         return try {
-            json.encodeToString(nodes)
+            var out = json.encodeToString(ordered)
+            var count = ordered.size
+            while (count > 1 && out.length > MAX_CHARS) {
+                count = (count * 3) / 4
+                out = json.encodeToString(ordered.take(count))
+            }
+            out
         } catch (e: Exception) {
             "[]"
         }
