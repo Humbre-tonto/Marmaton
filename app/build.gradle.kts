@@ -9,6 +9,8 @@ android {
     namespace = "com.marmaton.agent"
     compileSdk = 35
 
+    ndkVersion = "27.0.12077973"
+
     defaultConfig {
         applicationId = "com.marmaton.agent"
         minSdk = 26
@@ -26,6 +28,16 @@ android {
 
         buildConfigField("String", "POSTHOG_API_KEY", "\"$postHogApiKey\"")
         buildConfigField("String", "POSTHOG_HOST", "\"$postHogHost\"")
+
+        ndk {
+            abiFilters.add("arm64-v8a")
+        }
+    }
+
+    externalNativeBuild {
+        cmake {
+            path = file("src/main/cpp/CMakeLists.txt")
+        }
     }
 
     buildTypes {
@@ -35,6 +47,9 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            ndk {
+                debugSymbolLevel = "none"
+            }
         }
     }
     compileOptions {

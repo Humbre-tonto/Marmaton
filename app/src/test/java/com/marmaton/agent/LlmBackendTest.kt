@@ -154,4 +154,25 @@ class LlmBackendTest {
         assertEquals("content://saf/uri", updatedConfig.localModelUri)
         assertEquals("test_model.task", updatedConfig.localModelFileName)
     }
+
+    @Test
+    fun testBackendFactoryRouting() {
+        val mockContext = mock<Context>()
+
+        // GGUF extension should route to GgufBackend
+        val ggufConfig = BackendConfig(
+            selectedType = BackendType.LOCAL_FILE,
+            localModelFilePath = "/path/to/model.gguf"
+        )
+        val ggufBackend = BackendFactory.createBackend(mockContext, ggufConfig)
+        assertTrue(ggufBackend is GgufBackend)
+
+        // Non-GGUF extension should route to LocalFileBackend
+        val taskConfig = BackendConfig(
+            selectedType = BackendType.LOCAL_FILE,
+            localModelFilePath = "/path/to/model.task"
+        )
+        val taskBackend = BackendFactory.createBackend(mockContext, taskConfig)
+        assertTrue(taskBackend is LocalFileBackend)
+    }
 }
