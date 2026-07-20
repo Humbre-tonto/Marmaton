@@ -548,6 +548,8 @@ fun LocalBackendDetailScreen(onBack: () -> Unit) {
             }
 
             ModelCatalogSection()
+
+            DiagnosticsSection()
         }
     }
 }

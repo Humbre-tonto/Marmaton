@@ -108,4 +108,37 @@ class ParserSerializerTest {
         val parsed = GemmaAgentEngine.parseAction(invalidResponse)
         assertNull(parsed)
     }
+
+    @Test
+    fun testParsesBoundsAsSingleStringInArray() {
+        // Real output from Gemma 3 1B: fenced JSON, bounds as one comma-string inside the array,
+        // lowercase-able actionType. The parser must salvage this into a valid action.
+        val raw = """
+            ```json
+            {
+               "actionType": "CLICK",
+               "targetId": "battery_saver",
+               "bounds": [ "852, 134, 1036, 266" ],
+               "textToType": "Turn on Battery Saver",
+               "reasoning": "Clicking the visible battery saver control."
+            }
+            ```
+        """.trimIndent()
+
+        val action = GemmaAgentEngine.parseAction(raw)
+        assertNotNull(action)
+        assertEquals("CLICK", action?.actionType)
+        assertEquals(listOf(852, 134, 1036, 266), action?.bounds)
+        assertEquals("battery_saver", action?.targetId)
+    }
+
+    @Test
+    fun testParsesBoundsAsCommaStringAndLowercaseType() {
+        val raw = """{"actionType":"click","bounds":"10, 20, 30, 40","reasoning":"x"}"""
+        val action = GemmaAgentEngine.parseAction(raw)
+        assertNotNull(action)
+        assertEquals("CLICK", action?.actionType)
+        assertEquals(listOf(10, 20, 30, 40), action?.bounds)
+        assertNull(action?.targetId)
+    }
 }

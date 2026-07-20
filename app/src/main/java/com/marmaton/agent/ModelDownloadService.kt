@@ -147,10 +147,20 @@ class ModelDownloadService : Service() {
             null
         }
         if (headCode == 404) {
-            resolveRealTaskFile(client, model.url, token)?.let {
-                effectiveUrl = it.first
-                effectiveFileName = it.second
+            val resolved = resolveRealTaskFile(client, model.url, token)
+            if (resolved != null) {
+                effectiveUrl = resolved.first
+                effectiveFileName = resolved.second
+            } else {
+                fail("No Android-compatible file was found for ${model.name}. It may only be published as a web build — try Gemma 3 1B or another model.")
+                return
             }
+        }
+
+        // Web `.task` bundles use a different container the on-device engine can't open.
+        if (effectiveFileName.contains("web", ignoreCase = true)) {
+            fail("The available file for ${model.name} is a web build that can't run on-device. Try Gemma 3 1B or another model.")
+            return
         }
 
         val finalFile = File(dir, effectiveFileName)
@@ -297,9 +307,9 @@ class ModelDownloadService : Service() {
                     if (f.endsWith(".task")) tasks.add(f)
                 }
                 if (tasks.isEmpty()) return null
-                // Web variants don't load on Android; prefer a mobile q8, then q4, else the first.
+                // Web variants can't be opened by the on-device engine — never fall back to one.
                 val candidates = tasks.filterNot { it.contains("web", ignoreCase = true) }
-                    .ifEmpty { tasks }
+                if (candidates.isEmpty()) return null
                 val chosen = candidates.firstOrNull { it.contains("q8", ignoreCase = true) }
                     ?: candidates.firstOrNull { it.contains("q4", ignoreCase = true) }
                     ?: candidates.first()
