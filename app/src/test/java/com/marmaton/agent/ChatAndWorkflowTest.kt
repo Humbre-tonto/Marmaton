@@ -148,6 +148,17 @@ class ChatAndWorkflowTest {
     }
 
     @Test
+    fun derivesAppNameFromLaunchGoals() {
+        assertEquals("whatsapp", deriveAppNameFromGoal("open whatsapp"))
+        assertEquals("Chrome", deriveAppNameFromGoal("launch Chrome"))
+        assertEquals("new chat", deriveAppNameFromGoal("open new chat"))
+        // Not a launch instruction -> null
+        assertNull(deriveAppNameFromGoal("send hello to mom"))
+        // Too long to be an app name -> null
+        assertNull(deriveAppNameFromGoal("open the settings and turn on wifi please"))
+    }
+
+    @Test
     fun extractHostParsesUrls() {
         assertEquals("api.openai.com", extractHost("https://api.openai.com"))
         assertEquals("api.openai.com", extractHost("https://api.openai.com/v1/chat"))
