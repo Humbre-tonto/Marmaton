@@ -114,6 +114,28 @@ class ChatAndWorkflowTest {
 
     // ---------- Backend selection details ----------
 
+    // ---------- Agent action schema ----------
+
+    @Test
+    fun systemPromptAdvertisesPhoneControlActions() {
+        val prompt = com.marmaton.agent.llm.GemmaAgentEngine.buildSystemPrompt("open whatsapp", "[]")
+        // New phone-control actions must be described so the model can emit them.
+        assertTrue(prompt.contains("OPEN_APP"))
+        assertTrue(prompt.contains("BACK"))
+        assertTrue(prompt.contains("HOME"))
+        assertTrue(prompt.contains("ENTER"))
+    }
+
+    @Test
+    fun parsesOpenAppAction() {
+        val raw = """
+            {"actionType":"OPEN_APP","textToType":"WhatsApp","reasoning":"launch the app"}
+        """.trimIndent()
+        val action = com.marmaton.agent.llm.GemmaAgentEngine.parseAction(raw)
+        assertEquals("OPEN_APP", action?.actionType)
+        assertEquals("WhatsApp", action?.textToType)
+    }
+
     @Test
     fun extractHostParsesUrls() {
         assertEquals("api.openai.com", extractHost("https://api.openai.com"))

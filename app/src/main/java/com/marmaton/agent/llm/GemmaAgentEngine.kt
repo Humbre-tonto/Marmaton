@@ -135,7 +135,7 @@ object GemmaAgentEngine {
 
             You must output a structured action. Format your response exactly as a single JSON object matching this schema:
             {
-               "actionType": "CLICK" | "SWIPE_UP" | "SWIPE_DOWN" | "TYPE_TEXT" | "WAIT" | "FINISHED",
+               "actionType": "CLICK" | "TYPE_TEXT" | "SWIPE_UP" | "SWIPE_DOWN" | "OPEN_APP" | "BACK" | "HOME" | "ENTER" | "WAIT" | "FINISHED",
                "targetId": "string or null",
                "bounds": [left, top, right, bottom] or null,
                "textToType": "string or null",
@@ -145,12 +145,23 @@ object GemmaAgentEngine {
             Output ONLY the JSON object — no markdown, no code fences, no extra text.
             "bounds" must be exactly four plain integers, e.g. [852, 134, 1036, 266] — never strings or quoted numbers.
 
+            Action meanings:
+            - CLICK: tap an element. Provide its bounds or targetId.
+            - TYPE_TEXT: type into a text field. Put the text in textToType and the field's bounds/targetId.
+            - SWIPE_UP / SWIPE_DOWN: scroll to reveal more content.
+            - OPEN_APP: launch an app by name — put the app's name in textToType (e.g. "WhatsApp", "Settings", "Chrome"). ALWAYS prefer this to open an app instead of hunting for its icon on the home screen.
+            - BACK: press the system Back button. HOME: go to the home screen.
+            - ENTER: press the keyboard's Send/Search/Go key on the focused field (e.g. to submit a search or send a chat message after typing).
+            - WAIT: wait for a screen transition to finish.
+            - FINISHED: the goal is complete.
+
             Strategy:
-            1. If you see a button, switch, or field matching the goal, return CLICK with the correct bounds or target ID.
-            2. If you need to scroll down/up to find more settings/options, output SWIPE_DOWN or SWIPE_UP.
-            3. If you need to type, output TYPE_TEXT with the textToType and the target ID/bounds of the text field.
-            4. If the goal has been achieved successfully (e.g. settings changed, switch toggled, goal visible), output FINISHED.
-            5. If you need to wait for a screen transition, output WAIT.
+            1. To use a specific app (messages, settings, a browser), start with OPEN_APP.
+            2. If you see a button, switch, or field matching the goal, CLICK it (use its bounds or targetId).
+            3. To fill a field, TYPE_TEXT, then CLICK the send/next button or use ENTER to submit.
+            4. Use SWIPE_DOWN / SWIPE_UP to find off-screen content, and BACK to leave a wrong screen.
+            5. When the goal is clearly done (setting changed, message sent, target visible), output FINISHED.
+            6. If nothing useful is possible yet, output WAIT.
 
             Current Screen State:
             $serializedScreen
