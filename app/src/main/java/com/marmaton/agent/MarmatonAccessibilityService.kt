@@ -56,7 +56,12 @@ class MarmatonAccessibilityService : AccessibilityService() {
                 "BACK" -> performGlobalAction(GLOBAL_ACTION_BACK)
                 "HOME" -> performGlobalAction(GLOBAL_ACTION_HOME)
                 "RECENTS" -> performGlobalAction(GLOBAL_ACTION_RECENTS)
-                "OPEN_APP" -> openApp(action.textToType ?: action.targetId)
+                "OPEN_APP" -> {
+                    // OPEN_APP needs an app name. If the model emits OPEN_APP with no name but with
+                    // bounds/targetId (a common mistake for in-app "open X" goals), treat it as a tap.
+                    val appName = action.textToType?.takeIf { it.isNotBlank() }
+                    if (appName != null) openApp(appName) else performClickAction(action)
+                }
                 "ENTER" -> performImeEnter()
                 else -> false
             }
