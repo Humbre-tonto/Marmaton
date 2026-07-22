@@ -48,6 +48,9 @@ Java_com_marmaton_agent_llm_GgufBackend_00024Companion_load(
     llama_context_params cp = llama_context_default_params();
     cp.n_ctx = n_ctx;
     cp.n_threads = n_threads;
+    // Also thread the prompt/batch evaluation. Without this it can fall back to a low default,
+    // making the initial prompt eval (the bulk of per-step latency) painfully slow on phones.
+    cp.n_threads_batch = n_threads;
 
     llama_context* ctx = llama_new_context_with_model(model, cp);
     if (!ctx) {

@@ -22,11 +22,11 @@ class GgufBackend(
     companion object {
         // Context window for the native engine. Kept modest to fit phone RAM and keep prompt
         // evaluation fast; the app caps prompts well below this.
-        private const val N_CTX = 2048
+        private const val N_CTX = 1536
 
         // Cap generated tokens. Agent actions and on-device chat replies are short; a high cap just
         // means long, slow runs on a phone CPU when the model doesn't stop on its own.
-        private const val MAX_GEN_TOKENS = 200
+        private const val MAX_GEN_TOKENS = 160
 
         init {
             try {
