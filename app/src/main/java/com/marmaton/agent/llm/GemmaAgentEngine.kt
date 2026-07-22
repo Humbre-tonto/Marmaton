@@ -140,13 +140,15 @@ object GemmaAgentEngine {
             Keep "reasoning" to one short sentence.
 
             actionType is one of:
-            OPEN_APP (launch an app; put its name in textToType, e.g. "WhatsApp" — prefer this over finding an icon),
-            CLICK (tap; give bounds/targetId), TYPE_TEXT (type textToType into a field), ENTER (press keyboard Send/Search),
+            OPEN_APP (launch a whole app from outside; textToType MUST be the app name, e.g. "WhatsApp"),
+            CLICK (tap an on-screen element; give its bounds/targetId), TYPE_TEXT (type textToType into a field), ENTER (press keyboard Send/Search),
             SWIPE_UP, SWIPE_DOWN (scroll), BACK, HOME, WAIT (screen still loading), FINISHED (goal done).
 
             Rules:
-            - If the goal is to open an app and it is already the Foreground app, output FINISHED.
-            - Never OPEN_APP an app that is already the Foreground app.
+            - OPEN_APP is ONLY for launching an app by name. To do anything INSIDE the current app —
+              start a new chat, pick a contact, press a button — use CLICK on that element's bounds.
+              A goal like "open new chat" or "open settings menu" means CLICK that button, not OPEN_APP.
+            - If the goal is to open an app and it is already the Foreground app, output FINISHED. Never OPEN_APP the current Foreground app.
             - If the screen has no useful elements or is still loading, output WAIT (do not repeat the last action).
 
             Screen (JSON elements):
