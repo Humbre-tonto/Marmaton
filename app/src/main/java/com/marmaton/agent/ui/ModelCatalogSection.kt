@@ -73,9 +73,9 @@ fun ModelCatalogSection() {
                 color = MaterialTheme.colorScheme.primary
             )
             Text(
-                text = "Get an on-device model without leaving the app. These are MediaPipe .task " +
-                    "models from the Google AI Edge / LiteRT Community. Downloads run in the " +
-                    "background and resume if interrupted.",
+                text = "Get an on-device model without leaving the app. Ungated GGUF models (Qwen) " +
+                    "need no login and are recommended; gated Gemma .task models need a Hugging Face " +
+                    "token. Downloads run in the background and resume if interrupted.",
                 style = IonVioletTypography.bodySm,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -210,8 +210,9 @@ fun ModelCatalogSection() {
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
                             Text(model.name, style = IonVioletTypography.body)
+                            val kind = if (model.fileName.endsWith(".gguf", ignoreCase = true)) "GGUF" else ".task"
                             Text(
-                                text = "${model.sizeLabel} · .task",
+                                text = "${model.sizeLabel} · $kind",
                                 style = IonVioletTypography.bodySm,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )

@@ -19,6 +19,10 @@ class GgufBackend(
     private var modelHandle: Long = 0L
 
     companion object {
+        // Context window for the native engine. Kept modest to fit phone RAM and keep prompt
+        // evaluation fast; the app caps prompts well below this.
+        private const val N_CTX = 2048
+
         init {
             try {
                 System.loadLibrary("marmaton_llm")
@@ -56,7 +60,11 @@ class GgufBackend(
                 return@withContext
             }
             try {
-                val handle = load(modelPath, 4096, 4)
+                // Smaller context = far less KV-cache memory and faster prompt eval on phones;
+                // our prompts are capped well under this (screen prompt is trimmed, chat history
+                // truncated). Use most cores but leave headroom so the UI stays responsive.
+                val threads = Runtime.getRuntime().availableProcessors().coerceIn(2, 6)
+                val handle = load(modelPath, N_CTX, threads)
                 if (handle == 0L) {
                     throw IllegalStateException("Failed to load native GGUF model.")
                 }
