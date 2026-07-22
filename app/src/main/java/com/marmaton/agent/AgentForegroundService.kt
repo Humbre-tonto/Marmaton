@@ -45,6 +45,9 @@ class AgentForegroundService : Service() {
         private const val CHANNEL_ID = "MarmatonAgentChannel"
         private const val NOTIFICATION_ID = 1001
 
+        // Safety cap so a single goal can't loop forever (battery/runaway protection).
+        private const val MAX_STEPS_PER_GOAL = 30
+
         private val _isRunning = MutableStateFlow(false)
         val isRunning: StateFlow<Boolean> = _isRunning.asStateFlow()
 
@@ -163,6 +166,7 @@ class AgentForegroundService : Service() {
         loopJob = serviceScope.launch {
             var stepCount = 0
             var currentStepIndex = 0
+            var goalStepCount = 0
             val startTime = System.currentTimeMillis()
             var isSuccess = false
             var wasExceptionThrown = false
@@ -247,6 +251,16 @@ class AgentForegroundService : Service() {
                     }
 
                     stepCount++
+                    goalStepCount++
+
+                    // Runaway safety: never let a single goal loop forever draining the battery.
+                    if (goalStepCount > MAX_STEPS_PER_GOAL) {
+                        log("[Error] Couldn't finish this goal in $MAX_STEPS_PER_GOAL steps — stopping. Try rephrasing it more simply.")
+                        AgentVoice.speak("I couldn't finish that one.")
+                        _isRunning.value = false
+                        stopSelf()
+                        break
+                    }
 
                     log("[Reasoner] Think: ${action.reasoning}")
                     log("[Action] Decision: ${action.actionType} | Target: ${action.targetId ?: "N/A"} | Bounds: ${action.bounds ?: "N/A"}")
@@ -259,6 +273,7 @@ class AgentForegroundService : Service() {
                                 val completed = currentStepIndex + 1
                                 log("[Agent] Workflow step $completed of ${steps.size} done.")
                                 currentStepIndex++
+                                goalStepCount = 0 // fresh step budget for the next workflow step
                                 val nextGoal = steps[currentStepIndex]
                                 _userGoal.value = nextGoal
                                 log("[Agent] Next step: $nextGoal")

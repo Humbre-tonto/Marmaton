@@ -2,8 +2,10 @@ package com.marmaton.agent
 
 import android.accessibilityservice.AccessibilityService
 import android.accessibilityservice.GestureDescription
+import android.content.Intent
 import android.graphics.Path
 import android.graphics.Rect
+import android.os.Build
 import android.os.Bundle
 import android.util.Log
 import android.view.accessibility.AccessibilityEvent
@@ -51,12 +53,71 @@ class MarmatonAccessibilityService : AccessibilityService() {
                 "SWIPE_UP" -> performSwipe(up = true)
                 "SWIPE_DOWN" -> performSwipe(up = false)
                 "TYPE_TEXT" -> performTypeAction(action)
+                "BACK" -> performGlobalAction(GLOBAL_ACTION_BACK)
+                "HOME" -> performGlobalAction(GLOBAL_ACTION_HOME)
+                "RECENTS" -> performGlobalAction(GLOBAL_ACTION_RECENTS)
+                "OPEN_APP" -> openApp(action.textToType ?: action.targetId)
+                "ENTER" -> performImeEnter()
                 else -> false
             }
         } catch (e: Exception) {
             Log.e(TAG, "Error executing action: ${action.actionType}", e)
             false
         }
+    }
+
+    /**
+     * Launch an installed app by (fuzzy) display name — e.g. "WhatsApp", "settings", "chrome".
+     * Matching an app by name is far more reliable than making the model hunt for a launcher icon.
+     */
+    private fun openApp(appName: String?): Boolean {
+        val query = appName?.trim()?.lowercase()
+        if (query.isNullOrEmpty()) return false
+        val pm = packageManager
+        return try {
+            val launchIntent = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
+            val activities = pm.queryIntentActivities(launchIntent, 0)
+            // Prefer an exact label match, then a "starts with", then a "contains".
+            val ranked = activities
+                .mapNotNull { info ->
+                    val label = info.loadLabel(pm)?.toString()?.trim()?.lowercase() ?: return@mapNotNull null
+                    val pkg = info.activityInfo?.packageName ?: return@mapNotNull null
+                    val score = when {
+                        label == query -> 3
+                        label.startsWith(query) -> 2
+                        label.contains(query) || pkg.contains(query) -> 1
+                        else -> 0
+                    }
+                    if (score > 0) pkg to score else null
+                }
+                .sortedByDescending { it.second }
+            val pkg = ranked.firstOrNull()?.first
+            if (pkg == null) {
+                Log.w(TAG, "openApp: no installed app matched '$appName'")
+                return false
+            }
+            val intent = pm.getLaunchIntentForPackage(pkg) ?: return false
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            startActivity(intent)
+            true
+        } catch (e: Exception) {
+            Log.e(TAG, "openApp failed for '$appName'", e)
+            false
+        }
+    }
+
+    /** Press the keyboard's action key (Send/Search/Go/Enter) on the focused text field. */
+    private fun performImeEnter(): Boolean {
+        val root = rootInActiveWindow ?: return false
+        val focused = root.findFocus(AccessibilityNodeInfo.FOCUS_INPUT)
+        val ok = if (focused != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            focused.performAction(AccessibilityNodeInfo.AccessibilityAction.ACTION_IME_ENTER.id)
+        } else {
+            false
+        }
+        if (focused != null && focused != root) focused.recycle()
+        root.recycle()
+        return ok
     }
 
     private suspend fun performClickAction(action: AgentAction): Boolean {
