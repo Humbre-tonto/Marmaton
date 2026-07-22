@@ -64,12 +64,16 @@ class LocalFileBackend(
         return try {
             initEngine()
             BackendStatus.Ready
-        } catch (e: Exception) {
-            val msg = e.message ?: ""
-            val friendly = if (msg.contains("zip archive", ignoreCase = true) || msg.contains("104")) {
-                "This model file can't be opened by the on-device engine — it's likely a web build or an incompatible/corrupted .task. Delete it and download a different model (Gemma 3 1B works)."
-            } else {
-                "Failed to load model: $msg"
+        } catch (e: Throwable) {
+            // Throwable (not just Exception) so an OutOfMemoryError or other Error while loading a
+            // large .task surfaces as a friendly status instead of crashing the app.
+            val msg = e.message ?: e.javaClass.simpleName
+            val friendly = when {
+                e is OutOfMemoryError ->
+                    "Not enough free memory to load this model. Close other apps, or pick a smaller model."
+                msg.contains("zip archive", ignoreCase = true) || msg.contains("104") ->
+                    "This model file can't be opened by the on-device engine — it's likely a web build or an incompatible/corrupted .task. Delete it and download a different model (Qwen 2.5 1.5B works)."
+                else -> "Failed to load model: $msg"
             }
             BackendStatus.Unavailable(friendly)
         }

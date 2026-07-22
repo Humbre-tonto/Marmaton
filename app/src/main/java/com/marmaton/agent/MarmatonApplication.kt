@@ -19,6 +19,23 @@ class MarmatonApplication : Application() {
     override fun onCreate() {
         super.onCreate()
         FileLogger.init(this)
+
+        // Capture uncaught crashes into the shareable file log before the app dies, so a crash
+        // (e.g. a model that fails to load) can be diagnosed from Diagnostics → Share log instead
+        // of vanishing. Native (SIGSEGV) crashes can't be caught here, but JVM exceptions can.
+        val previousHandler = Thread.getDefaultUncaughtExceptionHandler()
+        Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
+            try {
+                FileLogger.log(
+                    "CRASH",
+                    "Uncaught on '${thread.name}': ${throwable.stackTraceToString()}"
+                )
+            } catch (_: Throwable) {
+                // Never let crash logging cause a second crash.
+            }
+            previousHandler?.uncaughtException(thread, throwable)
+        }
+
         Analytics.init(this, false)
 
         // Run background configuration collection to sync consent, track first-run and track changes
