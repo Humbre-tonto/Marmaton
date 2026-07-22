@@ -319,8 +319,20 @@ class AgentForegroundService : Service() {
                             delay(3000)
                         }
                         else -> {
+                            // If the model chose OPEN_APP but forgot the app name, derive it from
+                            // the goal (e.g. "open whatsapp" -> "whatsapp") so launch steps work
+                            // regardless of the model's formatting quirks.
+                            val toDispatch = if (
+                                action.actionType == "OPEN_APP" &&
+                                action.textToType.isNullOrBlank() &&
+                                action.bounds == null
+                            ) {
+                                deriveAppNameFromGoal(goal)?.let { action.copy(textToType = it) } ?: action
+                            } else {
+                                action
+                            }
                             AgentVoice.speak(action.reasoning.ifBlank { action.actionType })
-                            val dispatched = service.executeAction(action)
+                            val dispatched = service.executeAction(toDispatch)
                             if (dispatched) {
                                 log("[Action] Action executed successfully.")
                             } else {
@@ -377,4 +389,19 @@ class AgentForegroundService : Service() {
             manager?.createNotificationChannel(serviceChannel)
         }
     }
+}
+
+/**
+ * If a goal reads like a launch instruction ("open whatsapp", "launch chrome"), return the app
+ * name after the verb ("whatsapp", "chrome"). Used to salvage an OPEN_APP action when the model
+ * forgets to fill textToType. Returns null when the goal isn't a launch instruction.
+ */
+internal fun deriveAppNameFromGoal(goal: String): String? {
+    val trimmed = goal.trim()
+    val lower = trimmed.lowercase()
+    val prefixes = listOf("open ", "launch ", "start ", "go to ", "goto ")
+    val matched = prefixes.firstOrNull { lower.startsWith(it) } ?: return null
+    val name = trimmed.substring(matched.length).trim()
+    // Only treat a short phrase as an app name (avoid "open the settings and turn on wifi").
+    return name.takeIf { it.isNotBlank() && it.split(Regex("\\s+")).size <= 3 }
 }

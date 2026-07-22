@@ -145,10 +145,15 @@ object GemmaAgentEngine {
             SWIPE_UP, SWIPE_DOWN (scroll), BACK, HOME, WAIT (screen still loading), FINISHED (goal done).
 
             Rules:
+            - For OPEN_APP, textToType MUST be the app name and bounds MUST be null. Example:
+              {"actionType":"OPEN_APP","targetId":null,"bounds":null,"textToType":"WhatsApp","reasoning":"launch it"}
+            - Set bounds to null unless you are CLICK-ing or TYPE_TEXT-ing a specific element.
             - OPEN_APP is ONLY for launching an app by name. To do anything INSIDE the current app —
               start a new chat, pick a contact, press a button — use CLICK on that element's bounds.
               A goal like "open new chat" or "open settings menu" means CLICK that button, not OPEN_APP.
             - If the goal is to open an app and it is already the Foreground app, output FINISHED. Never OPEN_APP the current Foreground app.
+            - If the Foreground app is com.marmaton.agent, that is THIS controller app — do not tap its
+              buttons or text. OPEN_APP the target app instead.
             - If the screen has no useful elements or is still loading, output WAIT (do not repeat the last action).
 
             Screen (JSON elements):
