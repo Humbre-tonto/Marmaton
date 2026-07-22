@@ -129,41 +129,21 @@ object GemmaAgentEngine {
      * Decoupled system prompt builder to enable framework-free JVM unit testing of prompt generation.
      */
     fun buildSystemPrompt(userGoal: String, serializedScreen: String): String {
+        // Kept deliberately short: on-device models pay for every prompt token, so a terse prompt
+        // is much faster per step. bnd = bounds [left, top, right, bottom].
         return """
-            You are Marmaton, an extremely capable local Android device agent. Your goal is to help the user achieve: "$userGoal"
-            Below is the current screen state in a minimized JSON format of on-screen elements (bnd represents bounds: [left, top, right, bottom]).
+            You are Marmaton, an Android phone agent. Goal: "$userGoal"
+            Reply with ONE JSON object only (no markdown/prose):
+            {"actionType":"...","targetId":null,"bounds":[l,t,r,b]|null,"textToType":null,"reasoning":"short"}
+            bounds = exactly four plain integers, e.g. [852,134,1036,266].
+            Keep "reasoning" to one short sentence.
 
-            You must output a structured action. Format your response exactly as a single JSON object matching this schema:
-            {
-               "actionType": "CLICK" | "TYPE_TEXT" | "SWIPE_UP" | "SWIPE_DOWN" | "OPEN_APP" | "BACK" | "HOME" | "ENTER" | "WAIT" | "FINISHED",
-               "targetId": "string or null",
-               "bounds": [left, top, right, bottom] or null,
-               "textToType": "string or null",
-               "reasoning": "your step-by-step reasoning"
-            }
+            actionType is one of:
+            OPEN_APP (launch an app; put its name in textToType, e.g. "WhatsApp" — prefer this over finding an icon),
+            CLICK (tap; give bounds/targetId), TYPE_TEXT (type textToType into a field), ENTER (press keyboard Send/Search),
+            SWIPE_UP, SWIPE_DOWN (scroll), BACK, HOME, WAIT (screen still loading), FINISHED (goal done).
 
-            Output ONLY the JSON object — no markdown, no code fences, no extra text.
-            "bounds" must be exactly four plain integers, e.g. [852, 134, 1036, 266] — never strings or quoted numbers.
-
-            Action meanings:
-            - CLICK: tap an element. Provide its bounds or targetId.
-            - TYPE_TEXT: type into a text field. Put the text in textToType and the field's bounds/targetId.
-            - SWIPE_UP / SWIPE_DOWN: scroll to reveal more content.
-            - OPEN_APP: launch an app by name — put the app's name in textToType (e.g. "WhatsApp", "Settings", "Chrome"). ALWAYS prefer this to open an app instead of hunting for its icon on the home screen.
-            - BACK: press the system Back button. HOME: go to the home screen.
-            - ENTER: press the keyboard's Send/Search/Go key on the focused field (e.g. to submit a search or send a chat message after typing).
-            - WAIT: wait for a screen transition to finish.
-            - FINISHED: the goal is complete.
-
-            Strategy:
-            1. To use a specific app (messages, settings, a browser), start with OPEN_APP.
-            2. If you see a button, switch, or field matching the goal, CLICK it (use its bounds or targetId).
-            3. To fill a field, TYPE_TEXT, then CLICK the send/next button or use ENTER to submit.
-            4. Use SWIPE_DOWN / SWIPE_UP to find off-screen content, and BACK to leave a wrong screen.
-            5. When the goal is clearly done (setting changed, message sent, target visible), output FINISHED.
-            6. If nothing useful is possible yet, output WAIT.
-
-            Current Screen State:
+            Screen (JSON elements):
             $serializedScreen
         """.trimIndent()
     }
