@@ -2,6 +2,7 @@ package com.marmaton.agent.llm
 
 import android.content.Context
 import android.util.Log
+import com.marmaton.agent.util.FileLogger
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -22,6 +23,10 @@ class GgufBackend(
         // Context window for the native engine. Kept modest to fit phone RAM and keep prompt
         // evaluation fast; the app caps prompts well below this.
         private const val N_CTX = 2048
+
+        // Cap generated tokens. Agent actions and on-device chat replies are short; a high cap just
+        // means long, slow runs on a phone CPU when the model doesn't stop on its own.
+        private const val MAX_GEN_TOKENS = 200
 
         init {
             try {
@@ -60,10 +65,11 @@ class GgufBackend(
                 return@withContext
             }
             try {
-                // Smaller context = far less KV-cache memory and faster prompt eval on phones;
-                // our prompts are capped well under this (screen prompt is trimmed, chat history
-                // truncated). Use most cores but leave headroom so the UI stays responsive.
-                val threads = Runtime.getRuntime().availableProcessors().coerceIn(2, 6)
+                // Use roughly the number of "big" cores. On phone big.LITTLE CPUs, adding the
+                // slow efficiency cores drags the whole batch (llama.cpp waits for the slowest
+                // thread), so half the cores is usually FASTER than all of them.
+                val threads = (Runtime.getRuntime().availableProcessors() / 2).coerceIn(2, 4)
+                FileLogger.log("GgufBackend", "load ctx=$N_CTX threads=$threads")
                 val handle = load(modelPath, N_CTX, threads)
                 if (handle == 0L) {
                     throw IllegalStateException("Failed to load native GGUF model.")
@@ -99,7 +105,12 @@ class GgufBackend(
             throw IllegalStateException("GGUF native model handle is invalid.")
         }
         try {
-            generate(handle, prompt, 256)
+            val start = System.currentTimeMillis()
+            FileLogger.log("GgufBackend", "generate() start, prompt chars=${prompt.length}")
+            val out = generate(handle, prompt, MAX_GEN_TOKENS)
+            val ms = System.currentTimeMillis() - start
+            FileLogger.log("GgufBackend", "generate() done in ${ms}ms, chars=${out.length}")
+            out
         } catch (e: Exception) {
             Log.e("GgufBackend", "Error during JNI text generation", e)
             throw e
