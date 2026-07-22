@@ -167,6 +167,8 @@ class AgentForegroundService : Service() {
             var stepCount = 0
             var currentStepIndex = 0
             var goalStepCount = 0
+            var lastActionSig = ""
+            var repeatCount = 0
             val startTime = System.currentTimeMillis()
             var isSuccess = false
             var wasExceptionThrown = false
@@ -206,6 +208,7 @@ class AgentForegroundService : Service() {
                     }
 
                     val serializedScreen = ScreenTreeParser.serializeTree(rootNode)
+                    val currentApp = try { rootNode.packageName?.toString() } catch (e: Exception) { null }
                     rootNode.recycle()
 
                     log("[Reasoner] Analyzing screen state and reasoning next action...")
@@ -225,7 +228,7 @@ class AgentForegroundService : Service() {
                             // Run reasoning inline so we can surface the model's raw output when
                             // it can't be parsed into an action (e.g. a small model that doesn't
                             // emit valid JSON).
-                            val prompt = GemmaAgentEngine.buildSystemPrompt(goal, serializedScreen)
+                            val prompt = GemmaAgentEngine.buildSystemPrompt(goal, serializedScreen, currentApp)
                             val raw = backend.generate(prompt)
                             val parsed = GemmaAgentEngine.parseAction(raw)
                             if (parsed == null) {
@@ -265,6 +268,27 @@ class AgentForegroundService : Service() {
                     log("[Reasoner] Think: ${action.reasoning}")
                     log("[Action] Decision: ${action.actionType} | Target: ${action.targetId ?: "N/A"} | Bounds: ${action.bounds ?: "N/A"}")
 
+                    // Stall detection: if the model keeps emitting the identical action, the screen
+                    // isn't responding to it (e.g. re-opening an app that's already open). Stop
+                    // hammering it — let the screen settle, and give up if it never changes.
+                    val actionSig = "${action.actionType}|${action.textToType ?: ""}|${action.bounds ?: ""}"
+                    if (actionSig == lastActionSig) repeatCount++ else repeatCount = 0
+                    lastActionSig = actionSig
+                    if (action.actionType != "WAIT" && action.actionType != "FINISHED") {
+                        if (repeatCount >= 5) {
+                            log("[Agent] Stuck repeating the same action — stopping. Try a simpler goal or check the app.")
+                            AgentVoice.speak("I seem to be stuck.")
+                            _isRunning.value = false
+                            stopSelf()
+                            break
+                        }
+                        if (repeatCount >= 2) {
+                            log("[Agent] Same action repeated — letting the screen settle instead of repeating it.")
+                            delay(3500)
+                            continue
+                        }
+                    }
+
                     when (action.actionType) {
                         "FINISHED" -> {
                             val steps = _workflowSteps.value
@@ -274,6 +298,8 @@ class AgentForegroundService : Service() {
                                 log("[Agent] Workflow step $completed of ${steps.size} done.")
                                 currentStepIndex++
                                 goalStepCount = 0 // fresh step budget for the next workflow step
+                                lastActionSig = ""
+                                repeatCount = 0
                                 val nextGoal = steps[currentStepIndex]
                                 _userGoal.value = nextGoal
                                 log("[Agent] Next step: $nextGoal")
@@ -300,7 +326,9 @@ class AgentForegroundService : Service() {
                             } else {
                                 log("[Action] Warning: Action dispatch returned false/failed.")
                             }
-                            delay(3000) // Delay to let screen render new state
+                            // Opening an app is a cold start — give it longer to render before the
+                            // next observation, otherwise the screen still looks empty.
+                            delay(if (action.actionType == "OPEN_APP") 4500 else 3000)
                         }
                     }
                 }

@@ -128,12 +128,13 @@ object GemmaAgentEngine {
     /**
      * Decoupled system prompt builder to enable framework-free JVM unit testing of prompt generation.
      */
-    fun buildSystemPrompt(userGoal: String, serializedScreen: String): String {
+    fun buildSystemPrompt(userGoal: String, serializedScreen: String, currentApp: String? = null): String {
         // Kept deliberately short: on-device models pay for every prompt token, so a terse prompt
         // is much faster per step. bnd = bounds [left, top, right, bottom].
+        val currentAppLine = if (!currentApp.isNullOrBlank()) "Foreground app: $currentApp\n" else ""
         return """
             You are Marmaton, an Android phone agent. Goal: "$userGoal"
-            Reply with ONE JSON object only (no markdown/prose):
+            ${currentAppLine}Reply with ONE JSON object only (no markdown/prose):
             {"actionType":"...","targetId":null,"bounds":[l,t,r,b]|null,"textToType":null,"reasoning":"short"}
             bounds = exactly four plain integers, e.g. [852,134,1036,266].
             Keep "reasoning" to one short sentence.
@@ -142,6 +143,11 @@ object GemmaAgentEngine {
             OPEN_APP (launch an app; put its name in textToType, e.g. "WhatsApp" — prefer this over finding an icon),
             CLICK (tap; give bounds/targetId), TYPE_TEXT (type textToType into a field), ENTER (press keyboard Send/Search),
             SWIPE_UP, SWIPE_DOWN (scroll), BACK, HOME, WAIT (screen still loading), FINISHED (goal done).
+
+            Rules:
+            - If the goal is to open an app and it is already the Foreground app, output FINISHED.
+            - Never OPEN_APP an app that is already the Foreground app.
+            - If the screen has no useful elements or is still loading, output WAIT (do not repeat the last action).
 
             Screen (JSON elements):
             $serializedScreen
