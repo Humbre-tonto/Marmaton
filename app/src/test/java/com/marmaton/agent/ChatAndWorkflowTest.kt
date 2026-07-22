@@ -127,6 +127,17 @@ class ChatAndWorkflowTest {
     }
 
     @Test
+    fun systemPromptIncludesForegroundAppAndFinishRule() {
+        val prompt = com.marmaton.agent.llm.GemmaAgentEngine.buildSystemPrompt(
+            "open whatsapp", "[]", currentApp = "com.whatsapp"
+        )
+        assertTrue(prompt.contains("com.whatsapp"))
+        assertTrue(prompt.contains("Foreground app"))
+        // The rule that prevents the re-open loop must be present.
+        assertTrue(prompt.contains("already the Foreground app"))
+    }
+
+    @Test
     fun parsesOpenAppAction() {
         val raw = """
             {"actionType":"OPEN_APP","textToType":"WhatsApp","reasoning":"launch the app"}
